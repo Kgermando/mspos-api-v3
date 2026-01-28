@@ -47,4 +47,7 @@ func Connect() {
 		&models.RoutePlanItem{},
 		&models.Brand{},
 	)
+
+	// Initialiser le premier utilisateur Support s'il n'existe pas
+	InitializeSupportUser()
 }
