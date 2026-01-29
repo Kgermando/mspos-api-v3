@@ -42,8 +42,7 @@ func GetPaginatedBrands(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province").
-		Preload("PosFormItems").
+		Preload("Province"). 
 		Find(&dataList).Error
 
 	if err != nil {
@@ -110,8 +109,7 @@ func GetPaginatedBrandsByCountryUUID(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province").
-		Preload("PosFormItems").
+		Preload("Province"). 
 		Find(&dataList).Error
 
 	if err != nil {
@@ -178,8 +176,7 @@ func GetPaginatedBrandsByProvinceUUID(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province").
-		Preload("PosFormItems").
+		Preload("Province"). 
 		Find(&dataList).Error
 
 	if err != nil {
@@ -193,7 +190,7 @@ func GetPaginatedBrandsByProvinceUUID(c *fiber.Ctx) error {
 	// Calculate total pages
 	totalPages := int((totalRecords + int64(limit) - 1) / int64(limit))
 
-	fmt.Printf("Total Records: %d,Total Page: %d, Total Pages: %d\n", totalRecords, page, totalPages)
+	fmt.Printf("Total Records: %d,Total Page: %d, Total Pages: %d\n", totalRecords, page, totalPages) 
 
 	// Prepare pagination metadata
 	pagination := map[string]interface{}{
