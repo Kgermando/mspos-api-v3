@@ -20,5 +20,7 @@ type Brand struct {
 	Province     Province `gorm:"foreignKey:ProvinceUUID;references:UUID"`
 	Signature    string   `json:"signature"`
 
+	TotalBrandUsage float64 `gorm:"-" json:"total_brand_usage"`
+
 	PosFormItems []PosFormItems `gorm:"foreignKey:BrandUUID;references:UUID"`
 }

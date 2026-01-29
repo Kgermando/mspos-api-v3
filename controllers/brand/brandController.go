@@ -42,7 +42,7 @@ func GetPaginatedBrands(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province"). 
+		Preload("Province").
 		Find(&dataList).Error
 
 	if err != nil {
@@ -51,6 +51,15 @@ func GetPaginatedBrands(c *fiber.Ctx) error {
 			"message": "Failed to fetch provinces",
 			"error":   err.Error(),
 		})
+	}
+
+	// Calculate total_brand_usage for each brand
+	for i := range dataList {
+		var count int64
+		db.Model(&models.PosFormItems{}).
+			Where("brand_uuid = ?", dataList[i].UUID).
+			Count(&count)
+		dataList[i].TotalBrandUsage = float64(count)
 	}
 
 	// Calculate total pages
@@ -109,7 +118,7 @@ func GetPaginatedBrandsByCountryUUID(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province"). 
+		Preload("Province").
 		Find(&dataList).Error
 
 	if err != nil {
@@ -120,8 +129,17 @@ func GetPaginatedBrandsByCountryUUID(c *fiber.Ctx) error {
 		})
 	}
 
+	// Calculate total_brand_usage for each brand
+	for i := range dataList {
+		var count int64
+		db.Model(&models.PosFormItems{}).
+			Where("brand_uuid = ?", dataList[i].UUID).
+			Count(&count)
+		dataList[i].TotalBrandUsage = float64(count)
+	}
+
 	// Calculate total pages
-	totalPages := int((totalRecords + int64(limit) - 1) / int64(limit)) 
+	totalPages := int((totalRecords + int64(limit) - 1) / int64(limit))
 
 	// Prepare pagination metadata
 	pagination := map[string]interface{}{
@@ -176,7 +194,7 @@ func GetPaginatedBrandsByProvinceUUID(c *fiber.Ctx) error {
 		Limit(limit).
 		Order("updated_at DESC").
 		Preload("Country").
-		Preload("Province"). 
+		Preload("Province").
 		Find(&dataList).Error
 
 	if err != nil {
@@ -187,10 +205,19 @@ func GetPaginatedBrandsByProvinceUUID(c *fiber.Ctx) error {
 		})
 	}
 
+	// Calculate total_brand_usage for each brand
+	for i := range dataList {
+		var count int64
+		db.Model(&models.PosFormItems{}).
+			Where("brand_uuid = ?", dataList[i].UUID).
+			Count(&count)
+		dataList[i].TotalBrandUsage = float64(count)
+	}
+
 	// Calculate total pages
 	totalPages := int((totalRecords + int64(limit) - 1) / int64(limit))
 
-	fmt.Printf("Total Records: %d,Total Page: %d, Total Pages: %d\n", totalRecords, page, totalPages) 
+	fmt.Printf("Total Records: %d,Total Page: %d, Total Pages: %d\n", totalRecords, page, totalPages)
 
 	// Prepare pagination metadata
 	pagination := map[string]interface{}{
