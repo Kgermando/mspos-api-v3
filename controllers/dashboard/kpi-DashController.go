@@ -12,6 +12,10 @@ func TotalVisitsByCountry(c *fiber.Ctx) error {
 	db := database.DB
 
 	country_uuid := c.Query("country_uuid")
+	province_uuid := c.Query("province_uuid")
+	area_uuid := c.Query("area_uuid")
+	sub_area_uuid := c.Query("sub_area_uuid")
+	commune_uuid := c.Query("commune_uuid")
 	start_date := c.Query("start_date")
 	end_date := c.Query("end_date")
 
@@ -30,7 +34,7 @@ func TotalVisitsByCountry(c *fiber.Ctx) error {
 		Target       int     `json:"target"`
 	}
 
-	err := db.Table("pos_forms").
+	query := db.Table("pos_forms").
 		Select(`
 		countries.name AS name,
 		countries.uuid AS uuid, 
@@ -58,10 +62,25 @@ func TotalVisitsByCountry(c *fiber.Ctx) error {
 		`, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date).
 		Joins("JOIN users ON users.uuid = pos_forms.user_uuid").
 		Joins("JOIN countries ON countries.uuid = pos_forms.country_uuid").
-		Where("pos_forms.country_uuid = ?", country_uuid).
-		Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
-		Where("pos_forms.deleted_at IS NULL").
-		Group("countries.name, countries.uuid, users.fullname, users.title, users.uuid").
+		Where("pos_forms.country_uuid = ?", country_uuid)
+
+	if province_uuid != "" {
+		query = query.Where("pos_forms.province_uuid = ?", province_uuid)
+	}
+	if area_uuid != "" {
+		query = query.Where("pos_forms.area_uuid = ?", area_uuid)
+	}
+	if sub_area_uuid != "" {
+		query = query.Where("pos_forms.sub_area_uuid = ?", sub_area_uuid)
+	}
+	if commune_uuid != "" {
+		query = query.Where("pos_forms.commune_uuid = ?", commune_uuid)
+	}
+
+	query = query.Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
+		Where("pos_forms.deleted_at IS NULL")
+
+	err := query.Group("countries.name, countries.uuid, users.fullname, users.title, users.uuid").
 		Order("countries.name, users.fullname, users.title").
 		Scan(&results).Error
 
@@ -85,6 +104,9 @@ func TotalVisitsByProvince(c *fiber.Ctx) error {
 
 	country_uuid := c.Query("country_uuid")
 	province_uuid := c.Query("province_uuid")
+	area_uuid := c.Query("area_uuid")
+	sub_area_uuid := c.Query("sub_area_uuid")
+	commune_uuid := c.Query("commune_uuid")
 	start_date := c.Query("start_date")
 	end_date := c.Query("end_date")
 
@@ -102,7 +124,7 @@ func TotalVisitsByProvince(c *fiber.Ctx) error {
 		Target       int     `json:"target"`
 	}
 
-	err := db.Table("pos_forms").
+	query := db.Table("pos_forms").
 		Select(`
 		provinces.name AS name, 
 		pos_forms.country_uuid AS country_uuid,
@@ -134,10 +156,22 @@ func TotalVisitsByProvince(c *fiber.Ctx) error {
 		`, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date).
 		Joins("JOIN users ON users.uuid = pos_forms.user_uuid").
 		Joins("JOIN provinces ON provinces.uuid = pos_forms.province_uuid").
-		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ?", country_uuid, province_uuid).
-		Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
-		Where("pos_forms.deleted_at IS NULL").
-		Group(`
+		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ?", country_uuid, province_uuid)
+
+	if area_uuid != "" {
+		query = query.Where("pos_forms.area_uuid = ?", area_uuid)
+	}
+	if sub_area_uuid != "" {
+		query = query.Where("pos_forms.sub_area_uuid = ?", sub_area_uuid)
+	}
+	if commune_uuid != "" {
+		query = query.Where("pos_forms.commune_uuid = ?", commune_uuid)
+	}
+
+	query = query.Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
+		Where("pos_forms.deleted_at IS NULL")
+
+	err := query.Group(`
 			provinces.name, 
 			pos_forms.country_uuid, 
 			pos_forms.province_uuid, 
@@ -170,6 +204,9 @@ func TotalVisitsByArea(c *fiber.Ctx) error {
 
 	country_uuid := c.Query("country_uuid")
 	province_uuid := c.Query("province_uuid")
+	area_uuid := c.Query("area_uuid")
+	sub_area_uuid := c.Query("sub_area_uuid")
+	commune_uuid := c.Query("commune_uuid")
 	start_date := c.Query("start_date")
 	end_date := c.Query("end_date")
 
@@ -183,7 +220,7 @@ func TotalVisitsByArea(c *fiber.Ctx) error {
 		Target      int     `json:"target"`
 	}
 
-	err := db.Table("pos_forms").
+	query := db.Table("pos_forms").
 		Select(`
 		areas.name AS name,
 		areas.uuid AS uuid,
@@ -211,8 +248,19 @@ func TotalVisitsByArea(c *fiber.Ctx) error {
 		`, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date).
 		Joins("JOIN users ON users.uuid = pos_forms.user_uuid").
 		Joins("JOIN areas ON pos_forms.area_uuid = areas.uuid").
-		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ?", country_uuid, province_uuid).
-		Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
+		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ?", country_uuid, province_uuid)
+
+	if area_uuid != "" {
+		query = query.Where("pos_forms.area_uuid = ?", area_uuid)
+	}
+	if sub_area_uuid != "" {
+		query = query.Where("pos_forms.sub_area_uuid = ?", sub_area_uuid)
+	}
+	if commune_uuid != "" {
+		query = query.Where("pos_forms.commune_uuid = ?", commune_uuid)
+	}
+
+	err := query.Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
 		Where("pos_forms.deleted_at IS NULL").
 		Group("areas.name, areas.uuid, users.fullname, users.title, users.uuid").
 		Order("areas.name, users.fullname").
@@ -239,6 +287,8 @@ func TotalVisitsBySubArea(c *fiber.Ctx) error {
 	country_uuid := c.Query("country_uuid")
 	province_uuid := c.Query("province_uuid")
 	area_uuid := c.Query("area_uuid")
+	sub_area_uuid := c.Query("sub_area_uuid")
+	commune_uuid := c.Query("commune_uuid")
 	start_date := c.Query("start_date")
 	end_date := c.Query("end_date")
 
@@ -252,7 +302,7 @@ func TotalVisitsBySubArea(c *fiber.Ctx) error {
 		Target      int     `json:"target"`
 	}
 
-	err := db.Table("pos_forms").
+	query := db.Table("pos_forms").
 		Select(`
 		sub_areas.name AS name,
 		sub_areas.uuid AS uuid,
@@ -280,8 +330,16 @@ func TotalVisitsBySubArea(c *fiber.Ctx) error {
 		`, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date, end_date, start_date).
 		Joins("JOIN users ON users.uuid = pos_forms.user_uuid").
 		Joins("JOIN sub_areas ON pos_forms.sub_area_uuid = sub_areas.uuid").
-		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ? AND pos_forms.area_uuid = ?", country_uuid, province_uuid, area_uuid).
-		Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
+		Where("pos_forms.country_uuid = ? AND pos_forms.province_uuid = ? AND pos_forms.area_uuid = ?", country_uuid, province_uuid, area_uuid)
+
+	if sub_area_uuid != "" {
+		query = query.Where("pos_forms.sub_area_uuid = ?", sub_area_uuid)
+	}
+	if commune_uuid != "" {
+		query = query.Where("pos_forms.commune_uuid = ?", commune_uuid)
+	}
+
+	err := query.Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
 		Where("pos_forms.deleted_at IS NULL").
 		Group("sub_areas.name, sub_areas.uuid, users.fullname, users.title, users.uuid").
 		Order("sub_areas.name, users.fullname").

@@ -10,6 +10,7 @@ func GoogleMaps(c *fiber.Ctx) error {
 
 	start_date := c.Query("start_date")
 	end_date := c.Query("end_date")
+	search := c.Query("search")
 
 	var results []struct {
 		Latitude  float64 `json:"latitude"`  // Latitude of the user
@@ -25,7 +26,7 @@ func GoogleMaps(c *fiber.Ctx) error {
 		CreatedAt string  `json:"created_at"` // Creation date of the form
 	}
 
-	err := db.Table("pos_forms").
+	query := db.Table("pos_forms").
 		Joins("JOIN pos ON pos.uuid = pos_forms.pos_uuid").
 		Select(`
 			pos_forms.latitude AS latitude,
@@ -56,8 +57,19 @@ func GoogleMaps(c *fiber.Ctx) error {
 			END AS cyclo
 		`).
 		Where("pos_forms.created_at BETWEEN ? AND ?", start_date, end_date).
-		Where("pos_forms.deleted_at IS NULL").
-		Scan(&results).Error
+		Where("pos_forms.deleted_at IS NULL")
+
+	// Add search filter if search parameter is provided
+	if search != "" {
+		query = query.Where(`
+			LOWER(pos_forms.asm) LIKE LOWER(?) OR 
+			LOWER(pos_forms.sup) LIKE LOWER(?) OR 
+			LOWER(pos_forms.dr) LIKE LOWER(?) OR 
+			LOWER(pos_forms.cyclo) LIKE LOWER(?)
+		`, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+
+	err := query.Scan(&results).Error
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
