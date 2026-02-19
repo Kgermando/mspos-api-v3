@@ -10,7 +10,6 @@ import (
 	"github.com/danny19977/mspos-api-v3/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // Paginate
@@ -41,7 +40,7 @@ func GetPaginatedPos(c *fiber.Ctx) error {
 		Joins("LEFT JOIN users ON pos.user_uuid = users.uuid")
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -121,7 +120,7 @@ func GetPaginatedPosByCountryUUID(c *fiber.Ctx) error {
 		Where("pos.country_uuid = ?", CountryUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -201,7 +200,7 @@ func GetPaginatedPosByProvinceUUID(c *fiber.Ctx) error {
 		Where("pos.province_uuid = ?", ProvinceUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -281,7 +280,7 @@ func GetPaginatedPosByAreaUUID(c *fiber.Ctx) error {
 		Where("pos.area_uuid = ?", AreaUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -361,7 +360,7 @@ func GetPaginatedPosBySubAreaUUID(c *fiber.Ctx) error {
 		Where("pos.sub_area_uuid = ?", SubAreaUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -441,7 +440,7 @@ func GetPaginatedPosByCommuneUUID(c *fiber.Ctx) error {
 		Where("pos.user_uuid = ?", UserUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -519,7 +518,7 @@ func GetPaginatedPosByCommuneUserUUIDFilter(c *fiber.Ctx) error {
 		Where("pos.commune_uuid = ?", communeUUID)
 
 	// Apply advanced filters
-	query = applyAdvancedFilters(query, c)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
 
 	// Count total records
 	query.Count(&totalRecords)
@@ -834,181 +833,6 @@ func DeletePos(c *fiber.Ctx) error {
 	)
 }
 
-// Helper function to apply advanced filters for all paginated functions
-func applyAdvancedFilters(query *gorm.DB, c *fiber.Ctx) *gorm.DB {
-	// Filtres de recherche générale
-	search := c.Query("search", "")
-
-	// Filtres géographiques
-	country := c.Query("country", "")
-	province := c.Query("province", "")
-	area := c.Query("area", "")
-	subarea := c.Query("subarea", "")
-	commune := c.Query("commune", "")
-
-	// Filtres POS spécifiques
-	posType := c.Query("posType", "")
-	status := c.Query("status", "")
-	gerant := c.Query("gerant", "")
-	quartier := c.Query("quartier", "")
-
-	// Filtres utilisateur
-	userFullname := c.Query("userFullname", "")
-	userSearch := c.Query("userSearch", "")
-
-	// Filtres hiérarchie commerciale avec recherche intégrée
-	asm := c.Query("asm", "")
-	asmSearch := c.Query("asmSearch", "")
-	supervisor := c.Query("supervisor", "")
-	supervisorSearch := c.Query("supervisorSearch", "")
-	dr := c.Query("dr", "")
-	drSearch := c.Query("drSearch", "")
-	cyclo := c.Query("cyclo", "")
-	cycloSearch := c.Query("cycloSearch", "")
-
-	// Filtres temporels
-	quickDate := c.Query("quickDate", "")
-
-	// 🔍 Recherche générale dans tous les champs pertinents
-	if search != "" {
-		query = query.Where("pos.name ILIKE ? OR pos.shop ILIKE ? OR pos.postype ILIKE ? OR pos.gerant ILIKE ? OR pos.quartier ILIKE ? OR pos.reference ILIKE ?",
-			"%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
-	}
-
-	// 🌍 Filtres géographiques
-	if country != "" {
-		query = query.Where("countries.name = ?", country)
-	}
-	if province != "" {
-		query = query.Where("provinces.name = ?", province)
-	}
-	if area != "" {
-		query = query.Where("areas.name = ?", area)
-	}
-	if subarea != "" {
-		query = query.Where("sub_areas.name = ?", subarea)
-	}
-	if commune != "" {
-		query = query.Where("communes.name = ?", commune)
-	}
-
-	// 🏪 Filtres POS spécifiques
-	if posType != "" {
-		query = query.Where("pos.postype = ?", posType)
-	}
-	if gerant != "" {
-		query = query.Where("pos.gerant ILIKE ?", "%"+gerant+"%")
-	}
-	if quartier != "" {
-		query = query.Where("pos.quartier ILIKE ?", "%"+quartier+"%")
-	}
-
-	// 📊 Filtre statut du POS
-	switch status {
-	case "active":
-		query = query.Where("pos.status = ?", true)
-	case "inactive":
-		query = query.Where("pos.status = ?", false)
-	}
-
-	// 👤 Filtres utilisateur
-	if userFullname != "" {
-		query = query.Where("signature = ?", userFullname)
-	}
-	if userSearch != "" {
-		query = query.Where("signature ILIKE ?", "%"+userSearch+"%")
-	}
-
-	// 👔 Filtres hiérarchie commerciale avec recherche intégrée
-	// ASM - support recherche intégrée
-	if asm != "" {
-		query = query.Where("pos.asm = ?", asm)
-	}
-	if asmSearch != "" {
-		query = query.Where("pos.asm ILIKE ?", "%"+asmSearch+"%")
-	}
-
-	// Supervisor - support recherche intégrée
-	if supervisor != "" {
-		query = query.Where("pos.sup = ?", supervisor)
-	}
-	if supervisorSearch != "" {
-		query = query.Where("pos.sup ILIKE ?", "%"+supervisorSearch+"%")
-	}
-
-	// DR - support recherche intégrée
-	if dr != "" {
-		query = query.Where("pos.dr = ?", dr)
-	}
-	if drSearch != "" {
-		query = query.Where("pos.dr ILIKE ?", "%"+drSearch+"%")
-	}
-
-	// Cyclo - support recherche intégrée
-	if cyclo != "" {
-		query = query.Where("pos.cyclo = ?", cyclo)
-	}
-	if cycloSearch != "" {
-		query = query.Where("pos.cyclo ILIKE ?", "%"+cycloSearch+"%")
-	}
-
-	// 📅 Filtres rapides par date
-	if quickDate != "" {
-		switch quickDate {
-		case "today":
-			query = query.Where("DATE(pos.created_at) = CURRENT_DATE")
-		case "yesterday":
-			query = query.Where("DATE(pos.created_at) = CURRENT_DATE - INTERVAL '1 day'")
-		case "last7days":
-			query = query.Where("pos.created_at >= CURRENT_DATE - INTERVAL '7 days'")
-		case "last30days":
-			query = query.Where("pos.created_at >= CURRENT_DATE - INTERVAL '30 days'")
-		}
-	}
-
-	return query
-}
-
-// applyAdvancedFiltersForExcel applies advanced filters including date range for Excel reports
-func applyAdvancedFiltersForExcel(query *gorm.DB, c *fiber.Ctx) *gorm.DB {
-	// Apply all standard filters first
-	query = applyAdvancedFilters(query, c)
-
-	// Additional filters specific to Excel reports
-	startDate := c.Query("startDate", "")
-	endDate := c.Query("endDate", "")
-
-	// 📅 Filtres par plage de dates personnalisée (uniquement pour Excel)
-	if startDate != "" && endDate != "" {
-		// Validation et parsing des dates
-		startTime, err := time.Parse("2006-01-02", startDate)
-		if err == nil {
-			endTime, err := time.Parse("2006-01-02", endDate)
-			if err == nil {
-				// Ajouter 23:59:59 à la date de fin pour inclure toute la journée
-				endTime = endTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-				query = query.Where("pos.created_at >= ? AND pos.created_at <= ?", startTime, endTime)
-			}
-		}
-	} else if startDate != "" {
-		// Filtre à partir d'une date de début seulement
-		startTime, err := time.Parse("2006-01-02", startDate)
-		if err == nil {
-			query = query.Where("pos.created_at >= ?", startTime)
-		}
-	} else if endDate != "" {
-		// Filtre jusqu'à une date de fin seulement
-		endTime, err := time.Parse("2006-01-02", endDate)
-		if err == nil {
-			// Ajouter 23:59:59 à la date de fin pour inclure toute la journée
-			endTime = endTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-			query = query.Where("pos.created_at <= ?", endTime)
-		}
-	}
-
-	return query
-}
-
 // GeneratePosExcelReport generates an Excel report for POS data
 func GeneratePosExcelReport(c *fiber.Ctx) error {
 	db := database.DB
@@ -1026,8 +850,34 @@ func GeneratePosExcelReport(c *fiber.Ctx) error {
 		Joins("LEFT JOIN communes ON pos.commune_uuid = communes.uuid").
 		Joins("LEFT JOIN users ON pos.user_uuid = users.uuid")
 
-	// Apply advanced filters (including date range filters for Excel)
-	query = applyAdvancedFiltersForExcel(query, c)
+	// Apply common filters (geographic and agent filters)
+	query = utils.ApplyCommonFilters(query, c, "pos", []string{"name", "shop", "postype", "gerant", "quartier", "reference"})
+
+	// Apply date range filters for Excel export
+	startDate := c.Query("startDate", "")
+	endDate := c.Query("endDate", "")
+
+	if startDate != "" && endDate != "" {
+		startTime, err := time.Parse("2006-01-02", startDate)
+		if err == nil {
+			endTime, err := time.Parse("2006-01-02", endDate)
+			if err == nil {
+				endTime = endTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+				query = query.Where("pos.created_at >= ? AND pos.created_at <= ?", startTime, endTime)
+			}
+		}
+	} else if startDate != "" {
+		startTime, err := time.Parse("2006-01-02", startDate)
+		if err == nil {
+			query = query.Where("pos.created_at >= ?", startTime)
+		}
+	} else if endDate != "" {
+		endTime, err := time.Parse("2006-01-02", endDate)
+		if err == nil {
+			endTime = endTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+			query = query.Where("pos.created_at <= ?", endTime)
+		}
+	}
 
 	// Count total records
 	query.Count(&totalRecords)
