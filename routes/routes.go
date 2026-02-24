@@ -18,6 +18,7 @@ import (
 	"github.com/danny19977/mspos-api-v3/controllers/province"
 	"github.com/danny19977/mspos-api-v3/controllers/routeplan.go"
 
+	"github.com/danny19977/mspos-api-v3/controllers/observation"
 	RoutePlanItem "github.com/danny19977/mspos-api-v3/controllers/routeplanitem"
 	Subarea "github.com/danny19977/mspos-api-v3/controllers/subarea"
 	"github.com/danny19977/mspos-api-v3/controllers/sup"
@@ -282,6 +283,16 @@ func Setup(app *fiber.App) {
 	pe.Put("/update/:uuid", posequiment.UpdatePosEquipment)
 	pe.Delete("/delete/:uuid", posequiment.DeletePosEquipment)
 
+	// Observations controller — comments/observations from visit forms
+	// Role-based smart endpoint (reads JWT and applies filters automatically)
+	obs := api.Group("/observations")
+	obs.Get("/all/paginate", observation.GetObservationsByRole)
+	obs.Get("/all/paginate/country/:country_uuid", observation.GetObservationsByCountry)
+	obs.Get("/all/paginate/province/:province_uuid", observation.GetObservationsByProvince)
+	obs.Get("/all/paginate/area/:area_uuid", observation.GetObservationsByArea)
+	obs.Get("/all/paginate/subarea/:sub_area_uuid", observation.GetObservationsBySubArea)
+	obs.Get("/all/paginate/commune/:commune_uuid", observation.GetObservationsByCommune)
+
 	// UserLogs controller
 	log := api.Group("/users-logs")
 	log.Get("/all", user_logs.GetUserLogs)
@@ -328,14 +339,39 @@ func Setup(app *fiber.App) {
 
 	// Sales Evolution Dashboard
 	se := dash.Group("/sales-evolution")
+
+	// POS-type breakdown (volume + sold + market share per POS category)
 	se.Get("/table-view-province", dashboard.TypePosTableProvince)
 	se.Get("/table-view-area", dashboard.TypePosTableArea)
 	se.Get("/table-view-subarea", dashboard.TypePosTableSubArea)
 	se.Get("/table-view-commune", dashboard.TypePosTableCommune)
+
+	// Price analysis (avg / min / max / revenue per brand per territory)
 	se.Get("/table-view-province-price", dashboard.PriceTableProvince)
 	se.Get("/table-view-area-price", dashboard.PriceTableArea)
 	se.Get("/table-view-subarea-price", dashboard.PriceTableSubArea)
 	se.Get("/table-view-commune-price", dashboard.PriceTableCommune)
+
+	// Monthly evolution line chart (MoM trend + growth %)
+	se.Get("/evolution-by-month", dashboard.SalesEvolutionByMonth)
+
+	// Period-over-period growth rate comparison (curr vs prev window)
+	se.Get("/growth-rate", dashboard.SalesGrowthRate)
+
+	// Brand competition matrix (market share heatmap per geo × brand)
+	se.Get("/brand-competition-matrix", dashboard.BrandCompetitionMatrix)
+
+	// Top N POS ranking by farde / sold / revenue
+	se.Get("/top-pos-ranking", dashboard.TopPOSRanking)
+
+	// Sales representative performance scorecard
+	se.Get("/rep-scorecard", dashboard.SalesRepScorecard)
+
+	// Day-of-week heatmap (which days drive the most sales)
+	se.Get("/heatmap-day-of-week", dashboard.SalesHeatmapByDayOfWeek)
+
+	// Single KPI card: farde, sold, revenue, visits, active POS & agents
+	se.Get("/summary-kpi", dashboard.SalesSummaryKPI)
 
 	// Kpi Dashboard
 	kp := dash.Group("/kpi")
@@ -344,8 +380,7 @@ func Setup(app *fiber.App) {
 	kp.Get("/total-visits-by-area", dashboard.TotalVisitsByArea)
 	kp.Get("/total-visits-by-subarea", dashboard.TotalVisitsBySubArea)
 	kp.Get("/total-visits-by-commune", dashboard.TotalVisitsByCommune)
-
-	// Summary Dashboard
-	// sum := dash.Group("/summary")
+	// New: per-user summary table — Name | Daily | Monthly | Yearly | Total visits
+	kp.Get("/user-visit-summary", dashboard.KpiUserVisitSummary)
 
 }
