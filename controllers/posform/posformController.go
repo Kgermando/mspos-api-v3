@@ -8,8 +8,7 @@ import (
 	"github.com/danny19977/mspos-api-v3/database"
 	"github.com/danny19977/mspos-api-v3/models"
 	"github.com/danny19977/mspos-api-v3/utils"
-	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
+	"github.com/gofiber/fiber/v2" 
 )
 
 // Paginate ALL data
@@ -872,7 +871,7 @@ func CreatePosform(c *fiber.Ctx) error {
 		return err
 	}
 
-	p.UUID = uuid.New().String()
+	// p.UUID = uuid.New().String()
 
 	// p.Sync = true
 	database.DB.Create(p)

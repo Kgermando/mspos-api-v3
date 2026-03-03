@@ -5,8 +5,7 @@ import (
 	"strconv"
 
 	"github.com/danny19977/mspos-api-v3/database"
-	"github.com/danny19977/mspos-api-v3/models"
-	"github.com/danny19977/mspos-api-v3/utils"
+	"github.com/danny19977/mspos-api-v3/models" 
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -118,7 +117,7 @@ func CreatePosformItem(c *fiber.Ctx) error {
 		return err
 	}
 
-	p.UUID = utils.GenerateUUID()
+	// p.UUID = utils.GenerateUUID()
 	database.DB.Create(p)
 
 	return c.JSON(

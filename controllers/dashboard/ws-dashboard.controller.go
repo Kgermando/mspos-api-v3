@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"math"
+	"time"
 
 	"github.com/danny19977/mspos-api-v3/database"
 	"github.com/gofiber/fiber/v2"
@@ -534,7 +535,7 @@ func WSBarChartProvince(c *fiber.Ctx) error {
 
 	var results []WSBarRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -610,7 +611,7 @@ func WSBarChartArea(c *fiber.Ctx) error {
 
 	var results []WSBarRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -686,7 +687,7 @@ func WSBarChartSubArea(c *fiber.Ctx) error {
 
 	var results []WSBarRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -762,7 +763,7 @@ func WSBarChartCommune(c *fiber.Ctx) error {
 
 	var results []WSBarRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -855,7 +856,7 @@ func WSLineChartByMonth(c *fiber.Ctx) error {
 
 	var results []WSMonthRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "brand_uuid": brand_uuid,
 		"start_date": start_date, "end_date": end_date,
@@ -921,7 +922,7 @@ func WSSummaryKPI(c *fiber.Ctx) error {
 
 	var result WSKpi
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&result).Error
@@ -1002,7 +1003,7 @@ func WSBrandRanking(c *fiber.Ctx) error {
 
 	var results []WSRankRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -1072,7 +1073,7 @@ func WSGapAnalysis(c *fiber.Ctx) error {
 
 	var rows []WSGapRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&rows).Error
@@ -1179,7 +1180,7 @@ func WSHeatmap(c *fiber.Ctx) error {
 
 	var results []WSHeatRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 	}).Scan(&results).Error
@@ -1207,6 +1208,15 @@ func WSEvolution(c *fiber.Ctx) error {
 		})
 	}
 
+	// Compute previous period in Go to avoid @param::date casting issues in GORM
+	currStart, _ := time.Parse("2006-01-02", start_date)
+	currEnd, _ := time.Parse("2006-01-02", end_date)
+	periodDays := int(currEnd.Sub(currStart).Hours()/24) + 1
+	prevEnd := currStart.AddDate(0, 0, -1)
+	prevStart := prevEnd.AddDate(0, 0, -(periodDays - 1))
+	prev_start_date := prevStart.Format("2006-01-02")
+	prev_end_date := prevEnd.Format("2006-01-02")
+
 	sqlQuery := `
 		WITH curr_total AS (
 			SELECT SUM(pfi.sold) AS total_sold
@@ -1227,9 +1237,7 @@ func WSEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN
-			        (@start_date::date - (@end_date::date - @start_date::date + 1))
-			    AND (@start_date::date - 1)
+			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 		),
 		curr_brand AS (
@@ -1252,9 +1260,7 @@ func WSEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN
-			        (@start_date::date - (@end_date::date - @start_date::date + 1))
-			    AND (@start_date::date - 1)
+			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
@@ -1280,9 +1286,11 @@ func WSEvolution(c *fiber.Ctx) error {
 
 	var results []WSEvoRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
-		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
+		"commune_uuid": commune_uuid,
+		"start_date":   start_date, "end_date": end_date,
+		"prev_start_date": prev_start_date, "prev_end_date": prev_end_date,
 	}).Scan(&results).Error
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to fetch WS evolution", "error": err.Error()})
@@ -1367,7 +1375,7 @@ func WSvsNDCorrelation(c *fiber.Ctx) error {
 
 	var results []WSCorrRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "start_date": start_date, "end_date": end_date,
 		"threshold": threshold,
@@ -1452,7 +1460,7 @@ func WSPosDrillDown(c *fiber.Ctx) error {
 
 	var results []WSDrillRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid, "province_uuid": province_uuid,
+		"country_uuid": country_uuid, "province_uuid": province_uuid,
 		"area_uuid": area_uuid, "sub_area_uuid": sub_area_uuid,
 		"commune_uuid": commune_uuid, "brand_uuid": brand_uuid,
 		"start_date": start_date, "end_date": end_date,
@@ -1462,4 +1470,3 @@ func WSPosDrillDown(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"status": "success", "message": "WS POS Drill-Down", "data": results})
 }
-
