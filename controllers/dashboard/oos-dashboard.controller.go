@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"time"
+
 	"github.com/danny19977/mspos-api-v3/database"
 	"github.com/gofiber/fiber/v2"
 )
@@ -945,7 +947,7 @@ func OOSBrandRanking(c *fiber.Ctx) error {
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
-			ROW_NUMBER() OVER (ORDER BY oos_percent DESC)                    AS rank,
+			ROW_NUMBER() OVER (ORDER BY (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM visited), 0)) DESC) AS rank,
 			b.name                                                            AS brand_name,
 			b.uuid                                                            AS brand_uuid,
 			bo.oos_pos,
@@ -1271,6 +1273,15 @@ func OOSEvolution(c *fiber.Ctx) error {
 		})
 	}
 
+	// Pre-compute the previous period so we avoid GORM @param::cast parsing issues.
+	startTime, _ := time.Parse("2006-01-02", start_date)
+	endTime, _ := time.Parse("2006-01-02", end_date)
+	periodDays := int(endTime.Sub(startTime).Hours()/24) + 1
+	prevEndTime := startTime.AddDate(0, 0, -1)
+	prevStartTime := startTime.AddDate(0, 0, -periodDays)
+	prev_start_date := prevStartTime.Format("2006-01-02")
+	prev_end_date := prevEndTime.Format("2006-01-02")
+
 	type EvoRow struct {
 		BrandName          string  `json:"brand_name"`
 		BrandUUID          string  `json:"brand_uuid"`
@@ -1304,9 +1315,7 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN
-			        (@start_date::date - (@end_date::date - @start_date::date + 1))
-			    AND (@start_date::date - 1)
+			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
 			  AND pf.deleted_at IS NULL
 		),
 		curr_oos AS (
@@ -1331,9 +1340,7 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN
-			        (@start_date::date - (@end_date::date - @start_date::date + 1))
-			    AND (@start_date::date - 1)
+			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter = 0
 			GROUP BY pfi.brand_uuid
 		)
@@ -1374,13 +1381,15 @@ func OOSEvolution(c *fiber.Ctx) error {
 
 	var results []EvoRow
 	err := db.Raw(sqlQuery, map[string]interface{}{
-		"country_uuid":  country_uuid,
-		"province_uuid": province_uuid,
-		"area_uuid":     area_uuid,
-		"sub_area_uuid": sub_area_uuid,
-		"commune_uuid":  commune_uuid,
-		"start_date":    start_date,
-		"end_date":      end_date,
+		"country_uuid":    country_uuid,
+		"province_uuid":   province_uuid,
+		"area_uuid":       area_uuid,
+		"sub_area_uuid":   sub_area_uuid,
+		"commune_uuid":    commune_uuid,
+		"start_date":      start_date,
+		"end_date":        end_date,
+		"prev_start_date": prev_start_date,
+		"prev_end_date":   prev_end_date,
 	}).Scan(&results).Error
 
 	if err != nil {

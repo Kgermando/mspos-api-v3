@@ -1,4 +1,4 @@
-package dashboard
+﻿package dashboard
 
 import (
 	"math"
@@ -61,7 +61,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.province_uuid
 		),
@@ -85,7 +85,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
@@ -132,7 +132,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -170,7 +170,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.area_uuid
 		),
@@ -191,7 +191,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
@@ -238,7 +238,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -276,7 +276,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.sub_area_uuid
 		),
@@ -297,7 +297,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
@@ -344,7 +344,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -382,7 +382,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.commune_uuid
 		),
@@ -403,7 +403,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
@@ -450,7 +450,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -524,7 +524,7 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.` + geoCol + `
 		),
@@ -543,7 +543,7 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
@@ -576,7 +576,7 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&rawResults).Error
 
 	if err != nil {
@@ -676,7 +676,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY month
 		),
@@ -692,7 +692,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY month, pfi.brand_uuid
@@ -719,7 +719,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&rawRows).Error
 
 	if err != nil {
@@ -810,7 +810,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
 		nd_pos AS (
@@ -822,7 +822,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 		),
@@ -838,7 +838,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
@@ -863,7 +863,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&kpi).Error
 
 	if err != nil {
@@ -913,7 +913,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
 		brand_stats AS (
@@ -929,7 +929,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
@@ -957,7 +957,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -1024,7 +1024,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
 		nd_per_brand AS (
@@ -1036,7 +1036,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
@@ -1070,7 +1070,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {
@@ -1146,7 +1146,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 			GROUP BY pf.` + geoCol + `
 		),
@@ -1159,7 +1159,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
@@ -1188,7 +1188,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 		"sub_area_uuid": sub_area_uuid,
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
-		"end_date":      end_date,
+		"end_date":      end_date + " 23:59:59",
 	}).Scan(&raw).Error
 
 	if err != nil {
@@ -1296,7 +1296,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
 		prev_visited AS (
@@ -1307,7 +1307,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
+			  AND pf.created_at >= @prev_start_date AND pf.created_at <= @prev_end_date
 			  AND pf.deleted_at IS NULL
 		),
 		curr_nd AS (
@@ -1319,7 +1319,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		),
@@ -1332,7 +1332,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
-			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
+			  AND pf.created_at >= @prev_start_date AND pf.created_at <= @prev_end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
@@ -1379,9 +1379,9 @@ func NDEvolution(c *fiber.Ctx) error {
 		"sub_area_uuid":   sub_area_uuid,
 		"commune_uuid":    commune_uuid,
 		"start_date":      start_date,
-		"end_date":        end_date,
+		"end_date":      end_date + " 23:59:59",
 		"prev_start_date": prev_start_date,
-		"prev_end_date":   prev_end_date,
+		"prev_end_date": prev_end_date + " 23:59:59",
 	}).Scan(&results).Error
 
 	if err != nil {

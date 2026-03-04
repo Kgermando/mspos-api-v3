@@ -1155,7 +1155,7 @@ func SISHVelocityIndex(c *fiber.Ctx) error {
 			      ELSE 0 END::numeric, 3)                                            AS velocity_index,
 			-- Stock Turn: days worth of current stock at current sell rate
 			ROUND(CASE WHEN bd.brand_sold > 0
-			      THEN bd.brand_fardes / (bd.brand_sold / @period_days::float)
+			      THEN bd.brand_fardes / (bd.brand_sold / CAST(@period_days AS float))
 			      ELSE NULL END::numeric, 1)                                         AS stock_turn_days,
 			CASE
 				WHEN CASE WHEN bd.brand_fardes > 0
@@ -1364,8 +1364,8 @@ func SISHEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN
-			        (@start_date::date - (@end_date::date - @start_date::date + 1))
-			    AND (@start_date::date - 1)
+			        (CAST(@start_date AS date) - (CAST(@end_date AS date) - CAST(@start_date AS date) + 1))
+			    AND (CAST(@start_date AS date) - 1)
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		),
@@ -1485,7 +1485,7 @@ func SISHGapAnalysis(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH totals AS (
-			SELECT SUM(pfi.sold) AS total_sold, SUM(pfi.number_farde) AS total_fardes,
+			SELECT SUM(sub.brand_sold) AS total_sold, SUM(sub.brand_fardes) AS total_fardes,
 			       COUNT(*) AS brand_count
 			FROM (
 				SELECT pfi.brand_uuid,
