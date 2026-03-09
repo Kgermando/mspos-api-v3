@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/danny19977/mspos-api-v3/models"
@@ -30,23 +31,27 @@ func Connect() {
 	DB = connection
 	fmt.Println("Database Connected 🎉!")
 
-	connection.AutoMigrate(
-		&models.Country{},
-		&models.User{},
-		&models.UserLogs{},
-		&models.Province{},
-		&models.Area{},
-		&models.SubArea{},
-		&models.Commune{},
-		&models.Manager{},
-		&models.Pos{},
-		&models.PosEquipment{},
-		&models.PosForm{},
-		&models.PosFormItems{},
-		&models.RoutePlan{},
-		&models.RoutePlanItem{},
-		&models.Brand{},
-	)
+	migrateModel := func(model interface{}) {
+		if err := connection.AutoMigrate(model); err != nil {
+			log.Printf("AutoMigrate failed for %T: %v\n", model, err)
+		}
+	}
+
+	migrateModel(&models.Country{})
+	migrateModel(&models.Province{})
+	migrateModel(&models.Area{})
+	migrateModel(&models.SubArea{})
+	migrateModel(&models.Commune{})
+	migrateModel(&models.User{})
+	migrateModel(&models.UserLogs{})
+	migrateModel(&models.Manager{})
+	migrateModel(&models.Pos{})
+	migrateModel(&models.PosEquipment{})
+	migrateModel(&models.PosForm{})
+	migrateModel(&models.PosFormItems{})
+	migrateModel(&models.RoutePlan{})
+	migrateModel(&models.RoutePlanItem{})
+	migrateModel(&models.Brand{})
 
 	// Initialiser le premier utilisateur Support s'il n'existe pas
 	InitializeSupportUser()
