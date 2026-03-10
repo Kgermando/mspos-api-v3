@@ -10,7 +10,7 @@ import (
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║         OUT-OF-STOCK (OOS) DASHBOARD — HIGH-LEVEL ANALYTICS                ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  Out-of-Stock Rate = (POS where brand counter = 0)                          ║
+// ║  Out-of-Stock Rate = (POS where brand number_farde = 0)                     ║
 // ║                     ──────────────────────────────  × 100                  ║
 // ║                          Total distinct POS visited                          ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
@@ -24,10 +24,10 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1 — TABLE VIEWS
 // Each row = (territory × brand) with:
-//   oos_pos      — distinct POS where brand counter = 0
+//   oos_pos      — COUNT(DISTINCT pos_form_items.uuid) where number_farde = 0
 //   total_pos    — total distinct POS visited (any brand)
 //   oos_percent  — oos_pos / total_pos × 100  (higher = worse)
-//   coverage_pos — distinct POS where brand counter > 0 (in-stock)
+//   coverage_pos — COUNT(DISTINCT pos_form_items.uuid) where number_farde > 0
 //   coverage_pct — coverage_pos / total_pos × 100
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ func OOSTableViewProvince(c *fiber.Ctx) error {
 			SELECT
 				pf.province_uuid,
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+				COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -78,14 +78,14 @@ func OOSTableViewProvince(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		),
 		coverage_counts AS (
 			SELECT
 				pf.province_uuid,
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS coverage_pos
+				COUNT(DISTINCT pfi.uuid) AS coverage_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -95,7 +95,7 @@ func OOSTableViewProvince(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -184,7 +184,7 @@ func OOSTableViewArea(c *fiber.Ctx) error {
 			GROUP BY pf.area_uuid
 		),
 		oos_counts AS (
-			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -194,11 +194,11 @@ func OOSTableViewArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		),
 		coverage_counts AS (
-			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS coverage_pos
+			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS coverage_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -208,7 +208,7 @@ func OOSTableViewArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -297,7 +297,7 @@ func OOSTableViewSubArea(c *fiber.Ctx) error {
 			GROUP BY pf.sub_area_uuid
 		),
 		oos_counts AS (
-			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -307,11 +307,11 @@ func OOSTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		),
 		coverage_counts AS (
-			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS coverage_pos
+			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS coverage_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -321,7 +321,7 @@ func OOSTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -410,7 +410,7 @@ func OOSTableViewCommune(c *fiber.Ctx) error {
 			GROUP BY pf.commune_uuid
 		),
 		oos_counts AS (
-			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -420,11 +420,11 @@ func OOSTableViewCommune(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		),
 		coverage_counts AS (
-			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS coverage_pos
+			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS coverage_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -434,7 +434,7 @@ func OOSTableViewCommune(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -556,7 +556,7 @@ func buildOOSBarChart(c *fiber.Ctx, level string) error {
 		),
 		oos AS (
 			SELECT ` + ls.dim + ` AS dim_uuid, pfi.brand_uuid,
-			       COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			       COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -566,7 +566,7 @@ func buildOOSBarChart(c *fiber.Ctx, level string) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY ` + ls.dim + `, pfi.brand_uuid
 		)
 		SELECT
@@ -700,7 +700,7 @@ func OOSLineChartByMonth(c *fiber.Ctx) error {
 			SELECT
 				TO_CHAR(pf.created_at, 'YYYY-MM') AS month,
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid)        AS oos_pos
+				COUNT(DISTINCT pfi.uuid)           AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -710,7 +710,7 @@ func OOSLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY month, pfi.brand_uuid
 		)
 		SELECT
@@ -839,7 +839,7 @@ func OOSSummaryKPI(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		brand_oos AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -849,7 +849,7 @@ func OOSSummaryKPI(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
 		),
 		brand_pct AS (
@@ -933,7 +933,7 @@ func OOSBrandRanking(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		brand_oos AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -943,7 +943,7 @@ func OOSBrandRanking(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1043,7 +1043,7 @@ func OOSCriticalAlert(c *fiber.Ctx) error {
 		),
 		oos AS (
 			SELECT ` + ls.dim + ` AS dim_uuid, pfi.brand_uuid,
-			       COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			       COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1053,7 +1053,7 @@ func OOSCriticalAlert(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY ` + ls.dim + `, pfi.brand_uuid
 		)
 		SELECT
@@ -1161,7 +1161,7 @@ func OOSHeatmap(c *fiber.Ctx) error {
 		),
 		oos AS (
 			SELECT ` + ls.dim + ` AS dim_uuid, pfi.brand_uuid,
-			       COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			       COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1171,7 +1171,7 @@ func OOSHeatmap(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter = 0
+			  AND pfi.number_farde = 0
 			GROUP BY ` + ls.dim + `, pfi.brand_uuid
 		)
 		SELECT
@@ -1319,7 +1319,7 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		curr_oos AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1328,11 +1328,11 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter = 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
 		),
 		prev_oos AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS oos_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS oos_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1341,7 +1341,7 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter = 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT

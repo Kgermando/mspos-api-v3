@@ -6,26 +6,51 @@ import (
 
 	"github.com/danny19977/mspos-api-v3/database"
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║           NUMERIC DISTRIBUTION (ND) DASHBOARD — HIGH-LEVEL ANALYTICS       ║
+// ║           NUMERIC DISTRIBUTION (ND) DASHBOARD — HIGH-LEVEL ANALYTICS         ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  Numeric Distribution = (POS where brand counter > 0)                       ║
-// ║                        ──────────────────────────────  × 100               ║
-// ║                            Total distinct POS visited                        ║
+// ║  Numeric Distribution = (POS with at least one pos_form_items record)        ║
+// ║                        ──────────────────────────────────────  × 100         ║
+// ║                         Total registered POS on market (universe)            ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  SECTION 1 — TABLE VIEWS    : Province / Area / SubArea / Commune           ║
-// ║  SECTION 2 — BAR CHARTS     : Province / Area / SubArea / Commune           ║
-// ║  SECTION 3 — TREND CHART    : ND% by Brand per Month                        ║
-// ║  SECTION 4 — POWER ANALYTICS: Summary KPI / Brand Ranking / Gap Analysis    ║
+// ║  SECTION 1 — TABLE VIEWS    : Province / Area / SubArea / Commune            ║
+// ║  SECTION 2 — BAR CHARTS     : Province / Area / SubArea / Commune            ║
+// ║  SECTION 3 — TREND CHART    : ND% by Brand per Month                         ║
+// ║  SECTION 4 — POWER ANALYTICS: Summary KPI / Brand Ranking / Gap Analysis     ║
 // ║  SECTION 5 — ADVANCED       : Brand×Territory Heatmap / Period Evolution     ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
+
+// runRaw executes a raw named-param query inside a transaction that minimises
+// shared-memory usage, preventing SQLSTATE 53100 on containers with small
+// /dev/shm (e.g. Render.com, Docker with default shm_size).
+//   - work_mem '64kB'     — PostgreSQL minimum; forces spill-to-disk over
+//     large in-memory hash/sort buffers.
+//   - enable_hashagg off  — replaces HashAggregate with GroupAggregate (no
+//     shared-memory hash table).
+//   - enable_hashjoin off — replaces HashJoin with MergeJoin/NestLoop.
+func runRaw(db *gorm.DB, query string, params map[string]interface{}, dest interface{}) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		stmts := []string{
+			"SET LOCAL work_mem = '64kB'",
+			"SET LOCAL enable_hashagg = off",
+			"SET LOCAL enable_hashjoin = off",
+		}
+		for _, s := range stmts {
+			if err := tx.Exec(s).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Raw(query, params).Scan(dest).Error
+	})
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1 — TABLE VIEWS
 // Each row = (territory × brand) with:
-//   nd_pos       — distinct POS where the brand counter > 0
+//   nd_pos       — COUNT(DISTINCT pos_form_items.uuid) per territory/brand
 //   total_pos    — total distinct POS visited (any brand)
 //   nd_percent   — nd_pos / total_pos × 100
 //   universe_pos — total registered POS in the territory
@@ -77,7 +102,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			SELECT
 				pf.province_uuid,
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+				COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -87,7 +112,6 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -100,14 +124,14 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                         AS total_pos,
 			COALESCE(u.universe_pos, 0)                                      AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)        AS nd_percent,
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)     AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)     AS reach_rate
-		FROM nd_counts nd
-		INNER JOIN brands b   ON b.uuid  = nd.brand_uuid
-		INNER JOIN provinces pr ON pr.uuid = nd.province_uuid
-		LEFT  JOIN visited v  ON v.province_uuid  = nd.province_uuid
-		LEFT  JOIN universe u ON u.province_uuid  = nd.province_uuid
+		FROM universe u
+		INNER JOIN provinces pr ON pr.uuid = u.province_uuid
+		CROSS JOIN brands b
+		LEFT  JOIN nd_counts nd ON nd.province_uuid = u.province_uuid AND nd.brand_uuid = b.uuid
+		LEFT  JOIN visited v    ON v.province_uuid  = u.province_uuid
 		ORDER BY pr.name, nd_percent DESC
 	`
 
@@ -125,7 +149,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 	}
 
 	var results []NDRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -133,7 +157,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -183,7 +207,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			GROUP BY p.area_uuid
 		),
 		nd_counts AS (
-			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pf.area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -193,7 +217,6 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -206,14 +229,14 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS nd_percent,
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
-		FROM nd_counts nd
-		INNER JOIN brands b ON b.uuid = nd.brand_uuid
-		INNER JOIN areas  a ON a.uuid = nd.area_uuid
-		LEFT  JOIN visited v  ON v.area_uuid = nd.area_uuid
-		LEFT  JOIN universe u ON u.area_uuid = nd.area_uuid
+		FROM universe u
+		INNER JOIN areas a ON a.uuid = u.area_uuid
+		CROSS JOIN brands b
+		LEFT  JOIN nd_counts nd ON nd.area_uuid = u.area_uuid AND nd.brand_uuid = b.uuid
+		LEFT  JOIN visited v    ON v.area_uuid  = u.area_uuid
 		ORDER BY a.name, nd_percent DESC
 	`
 
@@ -231,7 +254,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 	}
 
 	var results []NDRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -239,7 +262,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -289,7 +312,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			GROUP BY p.sub_area_uuid
 		),
 		nd_counts AS (
-			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pf.sub_area_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -299,7 +322,6 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -312,14 +334,14 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS nd_percent,
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
-		FROM nd_counts nd
-		INNER JOIN brands   b  ON b.uuid  = nd.brand_uuid
-		INNER JOIN sub_areas sa ON sa.uuid = nd.sub_area_uuid
-		LEFT  JOIN visited v  ON v.sub_area_uuid = nd.sub_area_uuid
-		LEFT  JOIN universe u ON u.sub_area_uuid = nd.sub_area_uuid
+		FROM universe u
+		INNER JOIN sub_areas sa ON sa.uuid = u.sub_area_uuid
+		CROSS JOIN brands b
+		LEFT  JOIN nd_counts nd ON nd.sub_area_uuid = u.sub_area_uuid AND nd.brand_uuid = b.uuid
+		LEFT  JOIN visited v    ON v.sub_area_uuid  = u.sub_area_uuid
 		ORDER BY sa.name, nd_percent DESC
 	`
 
@@ -337,7 +359,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 	}
 
 	var results []NDRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -345,7 +367,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -395,7 +417,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			GROUP BY p.commune_uuid
 		),
 		nd_counts AS (
-			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pf.commune_uuid, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -405,7 +427,6 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -418,14 +439,14 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS nd_percent,
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
-		FROM nd_counts nd
-		INNER JOIN brands   b  ON b.uuid  = nd.brand_uuid
-		INNER JOIN communes cm ON cm.uuid = nd.commune_uuid
-		LEFT  JOIN visited v  ON v.commune_uuid = nd.commune_uuid
-		LEFT  JOIN universe u ON u.commune_uuid = nd.commune_uuid
+		FROM universe u
+		INNER JOIN communes cm ON cm.uuid = u.commune_uuid
+		CROSS JOIN brands b
+		LEFT  JOIN nd_counts nd ON nd.commune_uuid = u.commune_uuid AND nd.brand_uuid = b.uuid
+		LEFT  JOIN visited v    ON v.commune_uuid  = u.commune_uuid
 		ORDER BY cm.name, nd_percent DESC
 	`
 
@@ -443,7 +464,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 	}
 
 	var results []NDRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -451,7 +472,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -531,11 +552,16 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 		universe AS (
 			SELECT p.` + geoCol + `, COUNT(p.uuid) AS universe_pos
 			FROM pos p
-			WHERE p.country_uuid = @country_uuid AND p.deleted_at IS NULL
+			WHERE p.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR p.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR p.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR p.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR p.commune_uuid  = @commune_uuid)
+			  AND p.deleted_at IS NULL
 			GROUP BY p.` + geoCol + `
 		),
 		nd_counts AS (
-			SELECT pf.` + geoCol + `, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pf.` + geoCol + `, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -545,7 +571,6 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
 		)
 		SELECT
@@ -557,19 +582,19 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS nd_percent,
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
-		FROM nd_counts nd
-		INNER JOIN brands       b ON b.uuid = nd.brand_uuid
-		INNER JOIN ` + joinTable + ` t ON t.uuid = nd.` + geoCol + `
-		LEFT  JOIN visited v  ON v.` + geoCol + ` = nd.` + geoCol + `
-		LEFT  JOIN universe u ON u.` + geoCol + ` = nd.` + geoCol + `
+		FROM universe u
+		INNER JOIN ` + joinTable + ` t ON t.uuid = u.` + geoCol + `
+		CROSS JOIN brands b
+		LEFT  JOIN nd_counts nd ON nd.` + geoCol + ` = u.` + geoCol + ` AND nd.brand_uuid = b.uuid
+		LEFT  JOIN visited v    ON v.` + geoCol + `  = u.` + geoCol + `
 		ORDER BY t.name, nd_percent DESC
 	`
 
 	var rawResults []rawRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -577,7 +602,7 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&rawResults).Error
+	}, &rawResults)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -625,7 +650,9 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 func NDBarChartProvince(c *fiber.Ctx) error {
 	return ndBarChartBuilder(c, "province_uuid", "provinces", "province")
 }
-func NDBarChartArea(c *fiber.Ctx) error { return ndBarChartBuilder(c, "area_uuid", "areas", "area") }
+func NDBarChartArea(c *fiber.Ctx) error {
+	return ndBarChartBuilder(c, "area_uuid", "areas", "area")
+}
 func NDBarChartSubArea(c *fiber.Ctx) error {
 	return ndBarChartBuilder(c, "sub_area_uuid", "sub_areas", "subarea")
 }
@@ -666,7 +693,17 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 	}
 
 	sqlQuery := `
-		WITH monthly_visited AS (
+		WITH universe AS (
+			SELECT COUNT(p.uuid) AS cnt
+			FROM pos p
+			WHERE p.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR p.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR p.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR p.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR p.commune_uuid  = @commune_uuid)
+			  AND p.deleted_at IS NULL
+		),
+		monthly_visited AS (
 			SELECT
 				TO_CHAR(pf.created_at, 'YYYY-MM') AS month,
 				COUNT(DISTINCT pf.pos_uuid)        AS total_pos
@@ -684,7 +721,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			SELECT
 				TO_CHAR(pf.created_at, 'YYYY-MM') AS month,
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid)        AS nd_pos
+				COUNT(DISTINCT pfi.uuid)           AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -694,7 +731,6 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY month, pfi.brand_uuid
 		)
 		SELECT
@@ -704,7 +740,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			nm.nd_pos,
 			COALESCE(mv.total_pos, 0)                                           AS total_pos,
 			ROUND((nm.nd_pos * 100.0 /
-			       NULLIF(COALESCE(mv.total_pos, 0), 0))::numeric, 2)          AS nd_percent
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)         AS nd_percent
 		FROM nd_monthly nm
 		INNER JOIN brands b ON b.uuid = nm.brand_uuid
 		LEFT  JOIN monthly_visited mv ON mv.month = nm.month
@@ -712,7 +748,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 	`
 
 	var rawRows []MonthRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -720,7 +756,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&rawRows).Error
+	}, &rawRows)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -759,7 +795,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 //
 //	total_universe_pos  — total registered POS
 //	total_visited_pos   — distinct POS visited in period
-//	total_nd_pos        — POS where at least one brand counter > 0
+//	total_nd_pos        — POS with at least one pos_form_items record
 //	avg_nd_percent      — average ND% across all brands
 //	total_brands        — number of distinct brands measured
 //	reach_rate          — visited / universe × 100
@@ -814,7 +850,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		nd_pos AS (
-			SELECT COUNT(DISTINCT pf.pos_uuid) AS cnt
+			SELECT COUNT(DISTINCT pfi.uuid) AS cnt
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -824,13 +860,12 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 		),
 		brand_nd AS (
 			SELECT
 				pfi.brand_uuid,
-				ROUND((COUNT(DISTINCT pf.pos_uuid) * 100.0 /
-				       NULLIF((SELECT cnt FROM visited), 0))::numeric, 2) AS nd_pct
+				ROUND((COUNT(DISTINCT pfi.uuid) * 100.0 /
+				       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2) AS nd_pct
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -840,7 +875,6 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -856,7 +890,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 	`
 
 	var kpi KPI
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -864,7 +898,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&kpi).Error
+	}, &kpi)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -875,7 +909,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 }
 
 // NDBrandRanking — Brands ranked by ND% descending.
-// Also returns total_farde and avg_counter for deeper sales insight.
+// Also returns total_farde and avg_farde for deeper sales insight.
 func NDBrandRanking(c *fiber.Ctx) error {
 	db := database.DB
 
@@ -901,11 +935,21 @@ func NDBrandRanking(c *fiber.Ctx) error {
 		TotalPos   int64   `json:"total_pos"`
 		NdPercent  float64 `json:"nd_percent"`
 		TotalFarde float64 `json:"total_farde"`
-		AvgCounter float64 `json:"avg_counter"`
+		AvgFarde   float64 `json:"avg_farde"`
 	}
 
 	sqlQuery := `
-		WITH visited AS (
+		WITH universe AS (
+			SELECT COUNT(p.uuid) AS cnt
+			FROM pos p
+			WHERE p.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR p.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR p.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR p.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR p.commune_uuid  = @commune_uuid)
+			  AND p.deleted_at IS NULL
+		),
+		visited AS (
 			SELECT COUNT(DISTINCT pf.pos_uuid) AS total_pos
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
@@ -919,9 +963,9 @@ func NDBrandRanking(c *fiber.Ctx) error {
 		brand_stats AS (
 			SELECT
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid)             AS nd_pos,
+				COUNT(DISTINCT pfi.uuid)                 AS nd_pos,
 				ROUND(SUM(pfi.number_farde)::numeric, 2) AS total_farde,
-				ROUND(AVG(pfi.counter)::numeric, 2)      AS avg_counter
+				ROUND(AVG(pfi.number_farde)::numeric, 2) AS avg_farde
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -931,7 +975,6 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -941,16 +984,16 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			bs.nd_pos,
 			(SELECT total_pos FROM visited)                                    AS total_pos,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF((SELECT total_pos FROM visited), 0))::numeric, 2)   AS nd_percent,
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)        AS nd_percent,
 			bs.total_farde,
-			bs.avg_counter
+			bs.avg_farde
 		FROM brand_stats bs
 		INNER JOIN brands b ON b.uuid = bs.brand_uuid
 		ORDER BY nd_pos DESC
 	`
 
 	var results []RankRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -958,7 +1001,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -970,7 +1013,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 
 // NDGapAnalysis — 3-zone opportunity funnel per brand:
 //
-//	Zone A (ND Zone)       — POS where brand counter > 0
+//	Zone A (ND Zone)       — POS with at least one pos_form_items record
 //	Zone B (Visited Gap)   — POS visited but brand NOT present
 //	Zone C (Universe Gap)  — Registered POS never visited
 //
@@ -1028,7 +1071,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		nd_per_brand AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1038,7 +1081,6 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1050,7 +1092,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			(SELECT cnt FROM visited)                                             AS total_visited,
 			(SELECT cnt FROM universe)                                            AS total_universe,
 			ROUND((nb.nd_pos * 100.0 /
-			       NULLIF((SELECT cnt FROM visited), 0))::numeric, 2)            AS nd_percent,
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS nd_percent,
 			ROUND(((SELECT cnt FROM visited) * 100.0 /
 			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)           AS reach_rate,
 			ROUND(((GREATEST((SELECT cnt FROM visited) - nb.nd_pos, 0) +
@@ -1063,7 +1105,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 	`
 
 	var results []GapRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -1071,7 +1113,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&results).Error
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1138,7 +1180,13 @@ func NDHeatmap(c *fiber.Ctx) error {
 	}
 
 	sqlQuery := `
-		WITH visited AS (
+		WITH universe AS (
+			SELECT p.` + geoCol + `, COUNT(p.uuid) AS universe_pos
+			FROM pos p
+			WHERE p.country_uuid = @country_uuid AND p.deleted_at IS NULL
+			GROUP BY p.` + geoCol + `
+		),
+		visited AS (
 			SELECT pf.` + geoCol + `, COUNT(DISTINCT pf.pos_uuid) AS total_pos
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
@@ -1151,7 +1199,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 			GROUP BY pf.` + geoCol + `
 		),
 		nd_cells AS (
-			SELECT pf.` + geoCol + `, pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pf.` + geoCol + `, pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1161,7 +1209,6 @@ func NDHeatmap(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
 		)
 		SELECT
@@ -1172,16 +1219,17 @@ func NDHeatmap(c *fiber.Ctx) error {
 			COALESCE(nc.nd_pos, 0)                                            AS nd_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(nc.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS nd_percent
+			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent
 		FROM nd_cells nc
 		INNER JOIN brands       b ON b.uuid = nc.brand_uuid
 		INNER JOIN ` + joinTable + ` t ON t.uuid = nc.` + geoCol + `
 		LEFT  JOIN visited v ON v.` + geoCol + ` = nc.` + geoCol + `
+		LEFT  JOIN universe u ON u.` + geoCol + ` = nc.` + geoCol + `
 		ORDER BY b.name, t.name
 	`
 
 	var raw []CellRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":  country_uuid,
 		"province_uuid": province_uuid,
 		"area_uuid":     area_uuid,
@@ -1189,7 +1237,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 		"commune_uuid":  commune_uuid,
 		"start_date":    start_date,
 		"end_date":      end_date + " 23:59:59",
-	}).Scan(&raw).Error
+	}, &raw)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1288,7 +1336,17 @@ func NDEvolution(c *fiber.Ctx) error {
 	}
 
 	sqlQuery := `
-		WITH curr_visited AS (
+		WITH universe AS (
+			SELECT COUNT(p.uuid) AS cnt
+			FROM pos p
+			WHERE p.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR p.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR p.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR p.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR p.commune_uuid  = @commune_uuid)
+			  AND p.deleted_at IS NULL
+		),
+		curr_visited AS (
 			SELECT COUNT(DISTINCT pf.pos_uuid) AS cnt
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
@@ -1311,7 +1369,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		curr_nd AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1320,11 +1378,11 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		),
 		prev_nd AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1333,7 +1391,7 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at >= @prev_start_date AND pf.created_at <= @prev_end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1344,22 +1402,16 @@ func NDEvolution(c *fiber.Ctx) error {
 			(SELECT cnt FROM curr_visited)                                         AS current_total_pos,
 			(SELECT cnt FROM prev_visited)                                         AS previous_total_pos,
 			ROUND((COALESCE(cn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM curr_visited), 0))::numeric, 2)        AS current_nd_percent,
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS current_nd_percent,
 			ROUND((COALESCE(pn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM prev_visited), 0))::numeric, 2)        AS previous_nd_percent,
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS previous_nd_percent,
 			ROUND((COALESCE(cn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM curr_visited), 0) -
+			       NULLIF((SELECT cnt FROM universe), 0) -
 			       COALESCE(pn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM prev_visited), 0))::numeric, 2)        AS delta,
+			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS delta,
 			CASE
-				WHEN (COALESCE(cn.nd_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM curr_visited), 0)) >
-				     (COALESCE(pn.nd_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM prev_visited), 0)) THEN 'up'
-				WHEN (COALESCE(cn.nd_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM curr_visited), 0)) <
-				     (COALESCE(pn.nd_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM prev_visited), 0)) THEN 'down'
+				WHEN COALESCE(cn.nd_pos, 0) > COALESCE(pn.nd_pos, 0) THEN 'up'
+				WHEN COALESCE(cn.nd_pos, 0) < COALESCE(pn.nd_pos, 0) THEN 'down'
 				ELSE 'stable'
 			END AS trend
 		FROM (SELECT DISTINCT brand_uuid FROM curr_nd
@@ -1372,17 +1424,17 @@ func NDEvolution(c *fiber.Ctx) error {
 	`
 
 	var results []EvoRow
-	err := db.Raw(sqlQuery, map[string]interface{}{
+	err := runRaw(db, sqlQuery, map[string]interface{}{
 		"country_uuid":    country_uuid,
 		"province_uuid":   province_uuid,
 		"area_uuid":       area_uuid,
 		"sub_area_uuid":   sub_area_uuid,
 		"commune_uuid":    commune_uuid,
 		"start_date":      start_date,
-		"end_date":      end_date + " 23:59:59",
+		"end_date":        end_date + " 23:59:59",
 		"prev_start_date": prev_start_date,
-		"prev_end_date": prev_end_date + " 23:59:59",
-	}).Scan(&results).Error
+		"prev_end_date":   prev_end_date + " 23:59:59",
+	}, &results)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

@@ -10,7 +10,7 @@ import (
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║         WEIGHTED DISTRIBUTION (WD) DASHBOARD — VOLUME-WEIGHTED PRESENCE    ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  Weighted Distribution % =  SUM(fardes at POS where brand counter > 0)     ║
+// ║  Weighted Distribution % =  SUM(fardes at POS — COUNT(DISTINCT pfi.uuid))   ║
 // ║                            ─────────────────────────────────────────────── ║
 // ║                            SUM(total fardes at ALL visited POS) × 100      ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
@@ -28,10 +28,10 @@ import (
 // SECTION 1 — TABLE VIEWS
 //
 //	Each row = (territory × brand) with:
-//	  brand_volume   — total fardes at POS where brand counter > 0
+//	  brand_volume   — total fardes (all items per brand)
 //	  total_volume   — total fardes across ALL visited POS in the territory
 //	  wd_percent     — brand_volume / total_volume × 100
-//	  nd_pos         — distinct POS where brand counter > 0
+//	  nd_pos         — COUNT(DISTINCT pos_form_items.uuid) per brand
 //	  total_pos      — distinct POS visited
 //	  nd_percent     — nd_pos / total_pos × 100  (for comparison)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,12 +73,11 @@ func WDTableViewProvince(c *fiber.Ctx) error {
 			GROUP BY pf.province_uuid
 		),
 		brand_vol AS (
-			-- Fardes per brand at POS where that brand's counter > 0 (the numerator)
 			SELECT
 				pf.province_uuid,
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -88,7 +87,6 @@ func WDTableViewProvince(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -185,7 +183,7 @@ func WDTableViewArea(c *fiber.Ctx) error {
 				pf.area_uuid,
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -195,7 +193,6 @@ func WDTableViewArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -292,7 +289,7 @@ func WDTableViewSubArea(c *fiber.Ctx) error {
 				pf.sub_area_uuid,
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -302,7 +299,6 @@ func WDTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -399,7 +395,7 @@ func WDTableViewCommune(c *fiber.Ctx) error {
 				pf.commune_uuid,
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -409,7 +405,6 @@ func WDTableViewCommune(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -498,7 +493,6 @@ func wdBarChartSQL(geoCol, joinTable, levelLabel string) string {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
 		)
 		SELECT
@@ -642,7 +636,6 @@ func WDLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY month, pfi.brand_uuid
 		)
 		SELECT
@@ -747,7 +740,6 @@ func WDSummaryKPI(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		),
 		wd_pct AS (
@@ -857,7 +849,7 @@ func WDBrandRanking(c *fiber.Ctx) error {
 			SELECT
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -867,7 +859,6 @@ func WDBrandRanking(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -971,7 +962,6 @@ func WDGapAnalysis(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1089,7 +1079,6 @@ func WDHeatmap(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pf.` + geoCol + `, pfi.brand_uuid
 		)
 		SELECT
@@ -1236,7 +1225,7 @@ func WDEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		),
 		prev_brand AS (
@@ -1251,7 +1240,7 @@ func WDEvolution(c *fiber.Ctx) error {
 			  AND pf.created_at BETWEEN
 			        (@start_date::date - (@end_date::date - @start_date::date + 1))
 			    AND (@start_date::date - 1)
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1368,7 +1357,7 @@ func WDvsNDCorrelation(c *fiber.Ctx) error {
 			SELECT
 				pfi.brand_uuid,
 				SUM(pfi.number_farde)        AS brand_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS nd_pos
+				COUNT(DISTINCT pfi.uuid)     AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1378,7 +1367,6 @@ func WDvsNDCorrelation(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1450,7 +1438,7 @@ func WDvsNDCorrelation(c *fiber.Ctx) error {
 //
 //	?brand_uuid=<uuid> (required)
 //	Returns each POS where the brand was visited, with:
-//	  pos_volume     — total fardes of this brand at this POS (counter > 0)
+//	  pos_volume     — total fardes of this brand at this POS
 //	  total_volume   — total ALL-brand fardes at this POS
 //	  pos_wd_percent — pos_volume / total_volume × 100 (outlet-level weight)
 func WDPosDrillDown(c *fiber.Ctx) error {
@@ -1517,7 +1505,6 @@ func WDPosDrillDown(c *fiber.Ctx) error {
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.brand_uuid = @brand_uuid
-			  AND pfi.counter > 0
 			GROUP BY pf.pos_uuid
 		)
 		SELECT

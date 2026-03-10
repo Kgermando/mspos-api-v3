@@ -11,7 +11,7 @@ import (
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║         WEIGHTED SALES (WS) DASHBOARD — SALES-VOLUME WEIGHTED PRESENCE     ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  Weighted Sales % =  SUM(sold at POS where brand counter > 0)              ║
+// ║  Weighted Sales % =  SUM(sold at POS where brand number_farde > 0)         ║
 // ║                     ────────────────────────────────────────  × 100        ║
 // ║                     SUM(total sold across ALL visited POS)                  ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
@@ -29,10 +29,10 @@ import (
 // SECTION 1 — TABLE VIEWS
 //
 //	Each row = (territory × brand) with:
-//	  brand_sold    — total units sold at POS where brand counter > 0
+//	  brand_sold    — total units sold at POS where brand number_farde > 0
 //	  total_sold    — total units sold across ALL visited POS in the territory
 //	  ws_percent    — brand_sold / total_sold × 100
-//	  nd_pos        — distinct POS where brand counter > 0
+//	  nd_pos        — distinct POS where brand number_farde > 0
 //	  total_pos     — distinct POS visited
 //	  nd_percent    — nd_pos / total_pos × 100  (for comparison)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ func WSTableViewProvince(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -194,7 +194,7 @@ func WSTableViewArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -301,7 +301,7 @@ func WSTableViewSubArea(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -408,7 +408,7 @@ func WSTableViewCommune(c *fiber.Ctx) error {
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		)
 		SELECT
@@ -509,7 +509,7 @@ func WSBarChartProvince(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pf.province_uuid, pfi.brand_uuid
 		)
 		SELECT pr.name AS territory_name, pr.uuid AS territory_uuid,
@@ -585,7 +585,7 @@ func WSBarChartArea(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pf.area_uuid, pfi.brand_uuid
 		)
 		SELECT a.name AS territory_name, a.uuid AS territory_uuid,
@@ -661,7 +661,7 @@ func WSBarChartSubArea(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pf.sub_area_uuid, pfi.brand_uuid
 		)
 		SELECT sa.name AS territory_name, sa.uuid AS territory_uuid,
@@ -737,7 +737,7 @@ func WSBarChartCommune(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pf.commune_uuid, pfi.brand_uuid
 		)
 		SELECT co.name AS territory_name, co.uuid AS territory_uuid,
@@ -828,7 +828,7 @@ func WSLineChartByMonth(c *fiber.Ctx) error {
 			  AND (@brand_uuid    = '' OR pfi.brand_uuid   = @brand_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
+			  AND pfi.number_farde > 0
 			GROUP BY DATE_TRUNC('month', pf.created_at), pfi.brand_uuid
 		)
 		SELECT
@@ -891,7 +891,7 @@ func WSSummaryKPI(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH base AS (
-			SELECT pfi.brand_uuid, pfi.sold, pfi.counter
+			SELECT pfi.brand_uuid, pfi.sold, pfi.number_farde
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -905,10 +905,10 @@ func WSSummaryKPI(c *fiber.Ctx) error {
 		SELECT
 			COUNT(DISTINCT brand_uuid)                                           AS total_brands,
 			SUM(sold)                                                            AS grand_total_sold,
-			SUM(CASE WHEN counter > 0 THEN sold ELSE 0 END)                     AS weighted_sold,
-			ROUND((SUM(CASE WHEN counter > 0 THEN sold ELSE 0 END) * 100.0 /
+			SUM(CASE WHEN number_farde > 0 THEN sold ELSE 0 END)                AS weighted_sold,
+			ROUND((SUM(CASE WHEN number_farde > 0 THEN sold ELSE 0 END) * 100.0 /
 			       NULLIF(SUM(sold), 0))::numeric, 2)                            AS overall_ws_percent,
-			COUNT(DISTINCT CASE WHEN counter > 0 THEN brand_uuid END)           AS brands_with_ws
+			COUNT(DISTINCT CASE WHEN number_farde > 0 THEN brand_uuid END)      AS brands_with_ws
 		FROM base
 	`
 
@@ -971,7 +971,7 @@ func WSBrandRanking(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -1053,7 +1053,7 @@ func WSGapAnalysis(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT b.name AS brand_name, b.uuid AS brand_uuid, bw.ws_percent,
@@ -1155,7 +1155,7 @@ func WSHeatmap(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY ` + territoryGroup + `, t.name, pfi.brand_uuid
 		)
 		SELECT bs.territory_uuid, bs.territory_name,
@@ -1249,7 +1249,7 @@ func WSEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pfi.brand_uuid
 		),
 		prev_brand AS (
@@ -1261,7 +1261,7 @@ func WSEvolution(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT b.name AS brand_name, b.uuid AS brand_uuid,
@@ -1341,7 +1341,7 @@ func WSvsNDCorrelation(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.number_farde > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT b.name AS brand_name, b.uuid AS brand_uuid,
@@ -1425,7 +1425,6 @@ func WSPosDrillDown(c *fiber.Ctx) error {
 			b.name                                                               AS brand_name,
 			pfi.sold                                                             AS brand_sold,
 			COALESCE(pt.pos_sold, 0)                                             AS pos_total_sold,
-			pfi.counter,
 			pfi.number_farde,
 			ROUND((pfi.sold*100.0/NULLIF(pt.pos_sold,0))::numeric,2)            AS ws_contribution,
 			pf.created_at::date                                                  AS visit_date

@@ -1616,7 +1616,7 @@ func SOSVsNDCorrelation(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		brand_nd AS (
-			SELECT pfi.brand_uuid, COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1625,7 +1625,7 @@ func SOSVsNDCorrelation(c *fiber.Ctx) error {
 			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
 			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
 			  AND pf.created_at BETWEEN @start_date AND @end_date
-			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL AND pfi.counter > 0
+			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			GROUP BY pfi.brand_uuid
 		),
 		brand_shelf AS (
