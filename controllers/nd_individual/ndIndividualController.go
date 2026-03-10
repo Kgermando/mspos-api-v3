@@ -11,7 +11,7 @@ import (
 // ║  Chaque agent peut consulter son propre ND pour chaque marque afin      ║
 // ║  de le défendre lors des revues.                                        ║
 // ║                                                                          ║
-// ║  ND% = POS où counter > 0 / Total POS visités × 100                    ║
+// ║  ND% = COUNT(DISTINCT pos_form_items.uuid) / Total POS visités × 100   ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║  GET /nd-individual/summary/:user_uuid    — KPI global de l'agent       ║
 // ║  GET /nd-individual/by-brand/:user_uuid   — ND par marque               ║
@@ -24,7 +24,7 @@ import (
 
 // GetNDSummary retourne un résumé KPI global de l'agent :
 //   - total_pos_visited : total de POS distincts visités
-//   - nd_pos            : POS où au moins une marque a un counter > 0
+//   - nd_pos            : COUNT(DISTINCT pos_form_items.uuid) de l'agent
 //   - nd_percent        : nd_pos / total_pos_visited × 100
 //   - universe_pos      : total de POS enregistrés dans le territoire de l'agent
 //   - reach_rate        : total_pos_visited / universe_pos × 100
@@ -68,14 +68,13 @@ func GetNDSummary(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL
 		),
 		nd_visited AS (
-			SELECT COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+			SELECT COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_forms pf
 			INNER JOIN pos_form_items pfi ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.user_uuid = @user_uuid
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL
 			  AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 		),
 		universe AS (
 			SELECT COUNT(p.uuid) AS universe_pos
@@ -124,7 +123,7 @@ func GetNDSummary(c *fiber.Ctx) error {
 
 // GetNDByBrand retourne le ND par marque pour l'agent :
 //   - brand_name  : nom de la marque
-//   - nd_pos      : POS où counter > 0 pour cette marque
+//   - nd_pos      : COUNT(DISTINCT pos_form_items.uuid) pour cette marque
 //   - total_pos   : total POS visités par l'agent
 //   - nd_percent  : nd_pos / total_pos × 100
 //
@@ -162,14 +161,13 @@ func GetNDByBrand(c *fiber.Ctx) error {
 		nd_counts AS (
 			SELECT
 				pfi.brand_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS nd_pos
+				COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.user_uuid = @user_uuid
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL
 			  AND pfi.deleted_at IS NULL
-			  AND pfi.counter > 0
 			GROUP BY pfi.brand_uuid
 		)
 		SELECT
@@ -213,10 +211,10 @@ func GetNDByBrand(c *fiber.Ctx) error {
 //   - pos_name    : nom du POS
 //   - shop        : nom du shop
 //   - commune     : commune du POS
-//   - brand_name  : nom de la marque
-//   - counter     : valeur enregistrée (> 0 = ND actif)
-//   - nd_active   : true si counter > 0
-//   - visit_date  : date de la visite
+//   - brand_name    : nom de la marque
+//   - number_farde  : quantité en fardes enregistrée
+//   - nd_active     : true si number_farde > 0
+//   - visit_date    : date de la visite
 //
 // Params : user_uuid (path), start_date, end_date (query)
 func GetNDPosList(c *fiber.Ctx) error {
@@ -234,15 +232,15 @@ func GetNDPosList(c *fiber.Ctx) error {
 	}
 
 	type PosRow struct {
-		PosUUID   string `json:"pos_uuid"`
-		PosName   string `json:"pos_name"`
-		Shop      string `json:"shop"`
-		Commune   string `json:"commune"`
-		BrandUUID string `json:"brand_uuid"`
-		BrandName string `json:"brand_name"`
-		Counter   int    `json:"counter"`
-		NdActive  bool   `json:"nd_active"`
-		VisitDate string `json:"visit_date"`
+		PosUUID     string  `json:"pos_uuid"`
+		PosName     string  `json:"pos_name"`
+		Shop        string  `json:"shop"`
+		Commune     string  `json:"commune"`
+		BrandUUID   string  `json:"brand_uuid"`
+		BrandName   string  `json:"brand_name"`
+		NumberFarde float64 `json:"number_farde"`
+		NdActive    bool    `json:"nd_active"`
+		VisitDate   string  `json:"visit_date"`
 	}
 
 	sqlQuery := `
@@ -253,8 +251,8 @@ func GetNDPosList(c *fiber.Ctx) error {
 			c.name                                           AS commune,
 			b.uuid                                           AS brand_uuid,
 			b.name                                           AS brand_name,
-			pfi.counter                                      AS counter,
-			(pfi.counter > 0)                                AS nd_active,
+			pfi.number_farde                                 AS number_farde,
+			(pfi.number_farde > 0)                           AS nd_active,
 			TO_CHAR(pf.created_at, 'YYYY-MM-DD')             AS visit_date
 		FROM pos_forms pf
 		INNER JOIN pos_form_items pfi ON pfi.pos_form_uuid = pf.uuid
