@@ -257,5 +257,6 @@ func setupDashboardRoutes(api fiber.Router) {
 	kp.Get("/table-view/sub-area", dashboard.TotalVisitsBySubArea)
 	kp.Get("/table-view/commune", dashboard.TotalVisitsByCommune)
 	kp.Get("/user-visit-summary", dashboard.KpiUserVisitSummary)
+	kp.Get("/export-excel", dashboard.ExportKPIExcel)
 
 }
