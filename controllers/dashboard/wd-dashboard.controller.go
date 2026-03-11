@@ -60,7 +60,8 @@ func WDTableViewProvince(c *fiber.Ctx) error {
 			SELECT
 				pf.province_uuid,
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -102,7 +103,7 @@ func WDTableViewProvince(c *fiber.Ctx) error {
 			ROUND((bv.brand_volume * 100.0 /
 			       NULLIF(tv.total_volume, 0))::numeric, 2)                      AS wd_percent,
 			ROUND((bv.nd_pos * 100.0 /
-			       NULLIF(tv.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(tv.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_vol bv
 		INNER JOIN brands    b  ON b.uuid  = bv.brand_uuid
 		INNER JOIN provinces pr ON pr.uuid = bv.province_uuid
@@ -166,7 +167,8 @@ func WDTableViewArea(c *fiber.Ctx) error {
 			SELECT
 				pf.area_uuid,
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -208,7 +210,7 @@ func WDTableViewArea(c *fiber.Ctx) error {
 			ROUND((bv.brand_volume * 100.0 /
 			       NULLIF(tv.total_volume, 0))::numeric, 2)                      AS wd_percent,
 			ROUND((bv.nd_pos * 100.0 /
-			       NULLIF(tv.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(tv.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_vol bv
 		INNER JOIN brands b ON b.uuid = bv.brand_uuid
 		INNER JOIN areas  a ON a.uuid = bv.area_uuid
@@ -272,7 +274,8 @@ func WDTableViewSubArea(c *fiber.Ctx) error {
 			SELECT
 				pf.sub_area_uuid,
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -314,7 +317,7 @@ func WDTableViewSubArea(c *fiber.Ctx) error {
 			ROUND((bv.brand_volume * 100.0 /
 			       NULLIF(tv.total_volume, 0))::numeric, 2)                      AS wd_percent,
 			ROUND((bv.nd_pos * 100.0 /
-			       NULLIF(tv.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(tv.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_vol bv
 		INNER JOIN brands    b  ON b.uuid  = bv.brand_uuid
 		INNER JOIN sub_areas sa ON sa.uuid = bv.sub_area_uuid
@@ -378,7 +381,8 @@ func WDTableViewCommune(c *fiber.Ctx) error {
 			SELECT
 				pf.commune_uuid,
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -420,7 +424,7 @@ func WDTableViewCommune(c *fiber.Ctx) error {
 			ROUND((bv.brand_volume * 100.0 /
 			       NULLIF(tv.total_volume, 0))::numeric, 2)                      AS wd_percent,
 			ROUND((bv.nd_pos * 100.0 /
-			       NULLIF(tv.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(tv.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_vol bv
 		INNER JOIN brands   b  ON b.uuid  = bv.brand_uuid
 		INNER JOIN communes cm ON cm.uuid = bv.commune_uuid
@@ -834,7 +838,8 @@ func WDBrandRanking(c *fiber.Ctx) error {
 		WITH total_stats AS (
 			SELECT
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -874,11 +879,11 @@ func WDBrandRanking(c *fiber.Ctx) error {
 			bs.nd_pos,
 			(SELECT total_pos FROM total_stats)                                  AS total_pos,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF((SELECT total_pos FROM total_stats), 0))::numeric, 2)  AS nd_percent,
+			       NULLIF((SELECT total_posforms FROM total_stats), 0))::numeric, 2) AS nd_percent,
 			ROUND((bs.brand_volume * 100.0 /
 			       NULLIF((SELECT total_volume FROM total_stats), 0) -
 			       bs.nd_pos * 100.0 /
-			       NULLIF((SELECT total_pos FROM total_stats), 0))::numeric, 2)  AS wd_nd_gap
+			       NULLIF((SELECT total_posforms FROM total_stats), 0))::numeric, 2) AS wd_nd_gap
 		FROM brand_stats bs
 		INNER JOIN brands b ON b.uuid = bs.brand_uuid
 		ORDER BY wd_percent DESC
@@ -1342,7 +1347,8 @@ func WDvsNDCorrelation(c *fiber.Ctx) error {
 		WITH total_stats AS (
 			SELECT
 				SUM(pfi.number_farde)        AS total_volume,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -1379,16 +1385,16 @@ func WDvsNDCorrelation(c *fiber.Ctx) error {
 			bs.nd_pos,
 			(SELECT total_pos FROM total_stats)                                   AS total_pos,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF((SELECT total_pos FROM total_stats), 0))::numeric, 2)   AS nd_percent,
+			       NULLIF((SELECT total_posforms FROM total_stats), 0))::numeric, 2) AS nd_percent,
 			CASE
 				WHEN (bs.brand_volume * 100.0 / NULLIF((SELECT total_volume FROM total_stats), 0)) >= @threshold
-				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_pos FROM total_stats), 0)) >= @threshold
+				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_posforms FROM total_stats), 0)) >= @threshold
 				THEN 'leader'
 				WHEN (bs.brand_volume * 100.0 / NULLIF((SELECT total_volume FROM total_stats), 0)) >= @threshold
-				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_pos FROM total_stats), 0)) < @threshold
+				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_posforms FROM total_stats), 0)) < @threshold
 				THEN 'volume_focus'
 				WHEN (bs.brand_volume * 100.0 / NULLIF((SELECT total_volume FROM total_stats), 0)) < @threshold
-				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_pos FROM total_stats), 0)) >= @threshold
+				 AND (bs.nd_pos * 100.0 / NULLIF((SELECT total_posforms FROM total_stats), 0)) >= @threshold
 				THEN 'spread'
 				ELSE 'laggard'
 			END AS quadrant

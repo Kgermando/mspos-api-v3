@@ -12,9 +12,9 @@ import (
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║           NUMERIC DISTRIBUTION (ND) DASHBOARD — HIGH-LEVEL ANALYTICS         ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║  Numeric Distribution = (POS with at least one pos_form_items record)        ║
+// ║  Numeric Distribution = (COUNT of pos_form_items for a brand in period)      ║
 // ║                        ──────────────────────────────────────  × 100         ║
-// ║                         Total registered POS on market (universe)            ║
+// ║                         Total pos_forms submitted in period                  ║
 // ╠══════════════════════════════════════════════════════════════════════════════╣
 // ║  SECTION 1 — TABLE VIEWS    : Province / Area / SubArea / Commune            ║
 // ║  SECTION 2 — BAR CHARTS     : Province / Area / SubArea / Commune            ║
@@ -52,7 +52,7 @@ func runRaw(db *gorm.DB, query string, params map[string]interface{}, dest inter
 // Each row = (territory × brand) with:
 //   nd_pos       — COUNT(DISTINCT pos_form_items.uuid) per territory/brand
 //   total_pos    — total distinct POS visited (any brand)
-//   nd_percent   — nd_pos / total_pos × 100
+//   nd_percent   — nd_pos / total_posforms × 100
 //   universe_pos — total registered POS in the territory
 //   reach_rate   — total_pos / universe_pos × 100
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +79,8 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 		WITH visited AS (
 			SELECT
 				pf.province_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS total_pos
+				COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+				COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -124,7 +125,7 @@ func NDTableViewProvince(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                         AS total_pos,
 			COALESCE(u.universe_pos, 0)                                      AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)     AS nd_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)   AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)     AS reach_rate
 		FROM universe u
@@ -187,7 +188,9 @@ func NDTableViewArea(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.area_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.area_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -229,7 +232,7 @@ func NDTableViewArea(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
 		FROM universe u
@@ -292,7 +295,9 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.sub_area_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.sub_area_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -334,7 +339,7 @@ func NDTableViewSubArea(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
 		FROM universe u
@@ -397,7 +402,9 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.commune_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.commune_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -439,7 +446,7 @@ func NDTableViewCommune(c *fiber.Ctx) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
 		FROM universe u
@@ -538,7 +545,9 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.` + geoCol + `, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.` + geoCol + `,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -582,7 +591,7 @@ func ndBarChartBuilder(c *fiber.Ctx, geoCol, joinTable, level string) error {
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			COALESCE(u.universe_pos, 0)                                       AS universe_pos,
 			ROUND((COALESCE(nd.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS nd_percent,
 			ROUND((COALESCE(v.total_pos, 0) * 100.0 /
 			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS reach_rate
 		FROM universe u
@@ -706,7 +715,8 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 		monthly_visited AS (
 			SELECT
 				TO_CHAR(pf.created_at, 'YYYY-MM') AS month,
-				COUNT(DISTINCT pf.pos_uuid)        AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)        AS total_pos,
+				COUNT(DISTINCT pf.uuid)            AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -740,7 +750,7 @@ func NDLineChartByMonth(c *fiber.Ctx) error {
 			nm.nd_pos,
 			COALESCE(mv.total_pos, 0)                                           AS total_pos,
 			ROUND((nm.nd_pos * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)         AS nd_percent
+			       NULLIF(COALESCE(mv.total_posforms, 0), 0))::numeric, 2)     AS nd_percent
 		FROM nd_monthly nm
 		INNER JOIN brands b ON b.uuid = nm.brand_uuid
 		LEFT  JOIN monthly_visited mv ON mv.month = nm.month
@@ -861,11 +871,22 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 		),
+		posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		brand_nd AS (
 			SELECT
 				pfi.brand_uuid,
 				ROUND((COUNT(DISTINCT pfi.uuid) * 100.0 /
-				       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2) AS nd_pct
+				       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2) AS nd_pct
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -886,7 +907,7 @@ func NDSummaryKPI(c *fiber.Ctx) error {
 			ROUND(((SELECT cnt FROM visited) * 100.0 /
 			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)        AS reach_rate,
 			ROUND(((SELECT cnt FROM nd_pos) * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)        AS coverage_index
+			       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2)        AS coverage_index
 	`
 
 	var kpi KPI
@@ -960,6 +981,17 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
+		posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		brand_stats AS (
 			SELECT
 				pfi.brand_uuid,
@@ -984,7 +1016,7 @@ func NDBrandRanking(c *fiber.Ctx) error {
 			bs.nd_pos,
 			(SELECT total_pos FROM visited)                                    AS total_pos,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)        AS nd_percent,
+			       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2)        AS nd_percent,
 			bs.total_farde,
 			bs.avg_farde
 		FROM brand_stats bs
@@ -1070,6 +1102,17 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
+		posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		nd_per_brand AS (
 			SELECT pfi.brand_uuid, COUNT(DISTINCT pfi.uuid) AS nd_pos
 			FROM pos_form_items pfi
@@ -1092,7 +1135,7 @@ func NDGapAnalysis(c *fiber.Ctx) error {
 			(SELECT cnt FROM visited)                                             AS total_visited,
 			(SELECT cnt FROM universe)                                            AS total_universe,
 			ROUND((nb.nd_pos * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS nd_percent,
+			       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2)            AS nd_percent,
 			ROUND(((SELECT cnt FROM visited) * 100.0 /
 			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)           AS reach_rate,
 			ROUND(((GREATEST((SELECT cnt FROM visited) - nb.nd_pos, 0) +
@@ -1187,7 +1230,9 @@ func NDHeatmap(c *fiber.Ctx) error {
 			GROUP BY p.` + geoCol + `
 		),
 		visited AS (
-			SELECT pf.` + geoCol + `, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.` + geoCol + `,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -1219,7 +1264,7 @@ func NDHeatmap(c *fiber.Ctx) error {
 			COALESCE(nc.nd_pos, 0)                                            AS nd_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(nc.nd_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(u.universe_pos, 0), 0))::numeric, 2)      AS nd_percent
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS nd_percent
 		FROM nd_cells nc
 		INNER JOIN brands       b ON b.uuid = nc.brand_uuid
 		INNER JOIN ` + joinTable + ` t ON t.uuid = nc.` + geoCol + `
@@ -1357,8 +1402,30 @@ func NDEvolution(c *fiber.Ctx) error {
 			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
 			  AND pf.deleted_at IS NULL
 		),
+		curr_posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at >= @start_date AND pf.created_at <= @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		prev_visited AS (
 			SELECT COUNT(DISTINCT pf.pos_uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at >= @prev_start_date AND pf.created_at <= @prev_end_date
+			  AND pf.deleted_at IS NULL
+		),
+		prev_posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -1402,13 +1469,13 @@ func NDEvolution(c *fiber.Ctx) error {
 			(SELECT cnt FROM curr_visited)                                         AS current_total_pos,
 			(SELECT cnt FROM prev_visited)                                         AS previous_total_pos,
 			ROUND((COALESCE(cn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS current_nd_percent,
+			       NULLIF((SELECT cnt FROM curr_posforms), 0))::numeric, 2)         AS current_nd_percent,
 			ROUND((COALESCE(pn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS previous_nd_percent,
+			       NULLIF((SELECT cnt FROM prev_posforms), 0))::numeric, 2)         AS previous_nd_percent,
 			ROUND((COALESCE(cn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0) -
+			       NULLIF((SELECT cnt FROM curr_posforms), 0) -
 			       COALESCE(pn.nd_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM universe), 0))::numeric, 2)            AS delta,
+			       NULLIF((SELECT cnt FROM prev_posforms), 0))::numeric, 2)         AS delta,
 			CASE
 				WHEN COALESCE(cn.nd_pos, 0) > COALESCE(pn.nd_pos, 0) THEN 'up'
 				WHEN COALESCE(cn.nd_pos, 0) < COALESCE(pn.nd_pos, 0) THEN 'down'

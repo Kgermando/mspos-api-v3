@@ -53,7 +53,8 @@ func OOSTableViewProvince(c *fiber.Ctx) error {
 		WITH visited AS (
 			SELECT
 				pf.province_uuid,
-				COUNT(DISTINCT pf.pos_uuid) AS total_pos
+				COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+				COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -108,9 +109,9 @@ func OOSTableViewProvince(c *fiber.Ctx) error {
 			COALESCE(cc.coverage_pos, 0)                                      AS coverage_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(oos.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS oos_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS oos_percent,
 			ROUND((COALESCE(cc.coverage_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS coverage_pct
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS coverage_pct
 		FROM oos_counts oos
 		INNER JOIN brands b     ON b.uuid   = oos.brand_uuid
 		INNER JOIN provinces pr ON pr.uuid  = oos.province_uuid
@@ -172,7 +173,9 @@ func OOSTableViewArea(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.area_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.area_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -221,9 +224,9 @@ func OOSTableViewArea(c *fiber.Ctx) error {
 			COALESCE(cc.coverage_pos, 0)                                      AS coverage_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(oos.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS oos_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS oos_percent,
 			ROUND((COALESCE(cc.coverage_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS coverage_pct
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS coverage_pct
 		FROM oos_counts oos
 		INNER JOIN brands b  ON b.uuid  = oos.brand_uuid
 		INNER JOIN areas  a  ON a.uuid  = oos.area_uuid
@@ -285,7 +288,9 @@ func OOSTableViewSubArea(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.sub_area_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.sub_area_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -334,9 +339,9 @@ func OOSTableViewSubArea(c *fiber.Ctx) error {
 			COALESCE(cc.coverage_pos, 0)                                      AS coverage_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(oos.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS oos_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS oos_percent,
 			ROUND((COALESCE(cc.coverage_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS coverage_pct
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS coverage_pct
 		FROM oos_counts oos
 		INNER JOIN brands    b   ON b.uuid   = oos.brand_uuid
 		INNER JOIN sub_areas sa  ON sa.uuid  = oos.sub_area_uuid
@@ -398,7 +403,9 @@ func OOSTableViewCommune(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT pf.commune_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT pf.commune_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -447,9 +454,9 @@ func OOSTableViewCommune(c *fiber.Ctx) error {
 			COALESCE(cc.coverage_pos, 0)                                      AS coverage_pos,
 			COALESCE(v.total_pos, 0)                                          AS total_pos,
 			ROUND((COALESCE(oos.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS oos_percent,
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS oos_percent,
 			ROUND((COALESCE(cc.coverage_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS coverage_pct
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)     AS coverage_pct
 		FROM oos_counts oos
 		INNER JOIN brands    b   ON b.uuid   = oos.brand_uuid
 		INNER JOIN communes  cm  ON cm.uuid  = oos.commune_uuid
@@ -543,7 +550,9 @@ func buildOOSBarChart(c *fiber.Ctx, level string) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT ` + ls.dim + ` AS dim_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT ` + ls.dim + ` AS dim_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -574,7 +583,7 @@ func buildOOSBarChart(c *fiber.Ctx, level string) error {
 			b.name                                                            AS brand_name,
 			b.uuid                                                            AS brand_uuid,
 			ROUND((COALESCE(oos.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(v.total_pos, 0), 0))::numeric, 2)         AS oos_percent
+			       NULLIF(COALESCE(v.total_posforms, 0), 0))::numeric, 2)    AS oos_percent
 		FROM oos
 		` + ls.join + `
 		INNER JOIN brands b ON b.uuid = oos.brand_uuid
@@ -685,7 +694,8 @@ func OOSLineChartByMonth(c *fiber.Ctx) error {
 		WITH monthly_visited AS (
 			SELECT
 				TO_CHAR(pf.created_at, 'YYYY-MM') AS month,
-				COUNT(DISTINCT pf.pos_uuid)        AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)        AS total_pos,
+				COUNT(DISTINCT pf.uuid)            AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -720,7 +730,7 @@ func OOSLineChartByMonth(c *fiber.Ctx) error {
 			COALESCE(mo.oos_pos, 0)                                           AS oos_pos,
 			COALESCE(mv.total_pos, 0)                                         AS total_pos,
 			ROUND((COALESCE(mo.oos_pos, 0) * 100.0 /
-			       NULLIF(COALESCE(mv.total_pos, 0), 0))::numeric, 2)        AS oos_percent
+			       NULLIF(COALESCE(mv.total_posforms, 0), 0))::numeric, 2)   AS oos_percent
 		FROM monthly_oos mo
 		INNER JOIN brands         b  ON b.uuid  = mo.brand_uuid
 		LEFT  JOIN monthly_visited mv ON mv.month = mo.month
@@ -852,6 +862,17 @@ func OOSSummaryKPI(c *fiber.Ctx) error {
 			  AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
 		),
+		posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		brand_pct AS (
 			SELECT
 				bo.brand_uuid,
@@ -859,7 +880,7 @@ func OOSSummaryKPI(c *fiber.Ctx) error {
 				bo.oos_pos,
 				(SELECT total_visited FROM visited)                                    AS total_pos,
 				ROUND((bo.oos_pos * 100.0 /
-				       NULLIF((SELECT total_visited FROM visited), 0))::numeric, 2)   AS oos_percent
+				       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2)            AS oos_percent
 			FROM brand_oos bo
 			INNER JOIN brands b ON b.uuid = bo.brand_uuid
 		)
@@ -945,19 +966,30 @@ func OOSBrandRanking(c *fiber.Ctx) error {
 			  AND pf.deleted_at IS NULL AND pfi.deleted_at IS NULL
 			  AND pfi.number_farde = 0
 			GROUP BY pfi.brand_uuid
+		),
+		posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.deleted_at IS NULL
 		)
 		SELECT
-			ROW_NUMBER() OVER (ORDER BY (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM visited), 0)) DESC) AS rank,
+			ROW_NUMBER() OVER (ORDER BY (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM posforms), 0)) DESC) AS rank,
 			b.name                                                            AS brand_name,
 			b.uuid                                                            AS brand_uuid,
 			bo.oos_pos,
 			(SELECT cnt FROM visited)                                         AS total_pos,
 			ROUND((bo.oos_pos * 100.0 /
-			       NULLIF((SELECT cnt FROM visited), 0))::numeric, 2)        AS oos_percent,
+			       NULLIF((SELECT cnt FROM posforms), 0))::numeric, 2)       AS oos_percent,
 			CASE
-				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM visited), 0)) > 50 THEN 'critical'
-				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM visited), 0)) > 30 THEN 'high'
-				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM visited), 0)) > 15 THEN 'medium'
+				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM posforms), 0)) > 50 THEN 'critical'
+				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM posforms), 0)) > 30 THEN 'high'
+				WHEN (bo.oos_pos * 100.0 / NULLIF((SELECT cnt FROM posforms), 0)) > 15 THEN 'medium'
 				ELSE 'low'
 			END AS severity
 		FROM brand_oos bo
@@ -1030,7 +1062,9 @@ func OOSCriticalAlert(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT ` + ls.dim + ` AS dim_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT ` + ls.dim + ` AS dim_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -1060,18 +1094,18 @@ func OOSCriticalAlert(c *fiber.Ctx) error {
 			b.name                                                            AS brand_name,
 			b.uuid                                                            AS brand_uuid,
 			t.name                                                            AS territory_name,
-			ROUND((oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0))::numeric, 2) AS oos_percent,
+			ROUND((oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0))::numeric, 2) AS oos_percent,
 			CASE
-				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0)) > 50 THEN 'critical'
-				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0)) > 30 THEN 'high'
-				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0)) > 15 THEN 'medium'
+				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0)) > 50 THEN 'critical'
+				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0)) > 30 THEN 'high'
+				WHEN (oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0)) > 15 THEN 'medium'
 				ELSE 'low'
 			END AS severity
 		FROM oos
 		` + ls.join + `
 		INNER JOIN brands b ON b.uuid = oos.brand_uuid
 		LEFT  JOIN visited v ON v.dim_uuid = oos.dim_uuid
-		WHERE (oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0)) > 15
+		WHERE (oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0)) > 15
 		ORDER BY oos_percent DESC
 		LIMIT 20
 	`
@@ -1148,7 +1182,9 @@ func OOSHeatmap(c *fiber.Ctx) error {
 
 	sqlQuery := `
 		WITH visited AS (
-			SELECT ` + ls.dim + ` AS dim_uuid, COUNT(DISTINCT pf.pos_uuid) AS total_pos
+			SELECT ` + ls.dim + ` AS dim_uuid,
+			       COUNT(DISTINCT pf.pos_uuid) AS total_pos,
+			       COUNT(DISTINCT pf.uuid)     AS total_posforms
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -1179,7 +1215,7 @@ func OOSHeatmap(c *fiber.Ctx) error {
 			b.uuid  AS brand_uuid,
 			t.name  AS territory_name,
 			t.uuid  AS territory_uuid,
-			ROUND((oos.oos_pos * 100.0 / NULLIF(v.total_pos, 0))::numeric, 2) AS oos_percent
+			ROUND((oos.oos_pos * 100.0 / NULLIF(v.total_posforms, 0))::numeric, 2) AS oos_percent
 		FROM oos
 		` + ls.join + `
 		INNER JOIN brands b ON b.uuid = oos.brand_uuid
@@ -1307,8 +1343,30 @@ func OOSEvolution(c *fiber.Ctx) error {
 			  AND pf.created_at BETWEEN @start_date AND @end_date
 			  AND pf.deleted_at IS NULL
 		),
+		curr_posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at BETWEEN @start_date AND @end_date
+			  AND pf.deleted_at IS NULL
+		),
 		prev_visited AS (
 			SELECT COUNT(DISTINCT pf.pos_uuid) AS cnt
+			FROM pos_forms pf
+			WHERE pf.country_uuid = @country_uuid
+			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
+			  AND (@area_uuid     = '' OR pf.area_uuid     = @area_uuid)
+			  AND (@sub_area_uuid = '' OR pf.sub_area_uuid = @sub_area_uuid)
+			  AND (@commune_uuid  = '' OR pf.commune_uuid  = @commune_uuid)
+			  AND pf.created_at BETWEEN @prev_start_date AND @prev_end_date
+			  AND pf.deleted_at IS NULL
+		),
+		prev_posforms AS (
+			SELECT COUNT(DISTINCT pf.uuid) AS cnt
 			FROM pos_forms pf
 			WHERE pf.country_uuid = @country_uuid
 			  AND (@province_uuid = '' OR pf.province_uuid = @province_uuid)
@@ -1352,22 +1410,22 @@ func OOSEvolution(c *fiber.Ctx) error {
 			(SELECT cnt FROM curr_visited)                                         AS current_total_pos,
 			(SELECT cnt FROM prev_visited)                                         AS previous_total_pos,
 			ROUND((COALESCE(co.oos_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM curr_visited), 0))::numeric, 2)        AS current_oos_percent,
+			       NULLIF((SELECT cnt FROM curr_posforms), 0))::numeric, 2)       AS current_oos_percent,
 			ROUND((COALESCE(po.oos_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM prev_visited), 0))::numeric, 2)        AS previous_oos_percent,
+			       NULLIF((SELECT cnt FROM prev_posforms), 0))::numeric, 2)       AS previous_oos_percent,
 			ROUND((COALESCE(co.oos_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM curr_visited), 0) -
+			       NULLIF((SELECT cnt FROM curr_posforms), 0) -
 			       COALESCE(po.oos_pos, 0) * 100.0 /
-			       NULLIF((SELECT cnt FROM prev_visited), 0))::numeric, 2)        AS delta,
+			       NULLIF((SELECT cnt FROM prev_posforms), 0))::numeric, 2)       AS delta,
 			CASE
 				WHEN (COALESCE(co.oos_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM curr_visited), 0)) >
+				      NULLIF((SELECT cnt FROM curr_posforms), 0)) >
 				     (COALESCE(po.oos_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM prev_visited), 0)) THEN 'worsening'
+				      NULLIF((SELECT cnt FROM prev_posforms), 0)) THEN 'worsening'
 				WHEN (COALESCE(co.oos_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM curr_visited), 0)) <
+				      NULLIF((SELECT cnt FROM curr_posforms), 0)) <
 				     (COALESCE(po.oos_pos, 0) * 1.0 /
-				      NULLIF((SELECT cnt FROM prev_visited), 0)) THEN 'improving'
+				      NULLIF((SELECT cnt FROM prev_posforms), 0)) THEN 'improving'
 				ELSE 'stable'
 			END AS trend
 		FROM (SELECT DISTINCT brand_uuid FROM curr_oos

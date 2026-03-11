@@ -60,7 +60,8 @@ func WSTableViewProvince(c *fiber.Ctx) error {
 			SELECT
 				pf.province_uuid,
 				SUM(pfi.sold)                AS total_sold,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -103,7 +104,7 @@ func WSTableViewProvince(c *fiber.Ctx) error {
 			ROUND((bs.brand_sold * 100.0 /
 			       NULLIF(ts.total_sold, 0))::numeric, 2)                        AS ws_percent,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF(ts.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(ts.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_sales bs
 		INNER JOIN brands    b  ON b.uuid  = bs.brand_uuid
 		INNER JOIN provinces pr ON pr.uuid = bs.province_uuid
@@ -167,7 +168,8 @@ func WSTableViewArea(c *fiber.Ctx) error {
 			SELECT
 				pf.area_uuid,
 				SUM(pfi.sold)                AS total_sold,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -210,7 +212,7 @@ func WSTableViewArea(c *fiber.Ctx) error {
 			ROUND((bs.brand_sold * 100.0 /
 			       NULLIF(ts.total_sold, 0))::numeric, 2)                        AS ws_percent,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF(ts.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(ts.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_sales bs
 		INNER JOIN brands b ON b.uuid = bs.brand_uuid
 		INNER JOIN areas  a ON a.uuid = bs.area_uuid
@@ -274,7 +276,8 @@ func WSTableViewSubArea(c *fiber.Ctx) error {
 			SELECT
 				pf.sub_area_uuid,
 				SUM(pfi.sold)                AS total_sold,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -317,7 +320,7 @@ func WSTableViewSubArea(c *fiber.Ctx) error {
 			ROUND((bs.brand_sold * 100.0 /
 			       NULLIF(ts.total_sold, 0))::numeric, 2)                        AS ws_percent,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF(ts.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(ts.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_sales bs
 		INNER JOIN brands    b  ON b.uuid  = bs.brand_uuid
 		INNER JOIN sub_areas sa ON sa.uuid = bs.sub_area_uuid
@@ -381,7 +384,8 @@ func WSTableViewCommune(c *fiber.Ctx) error {
 			SELECT
 				pf.commune_uuid,
 				SUM(pfi.sold)                AS total_sold,
-				COUNT(DISTINCT pf.pos_uuid)  AS total_pos
+				COUNT(DISTINCT pf.pos_uuid)  AS total_pos,
+				COUNT(DISTINCT pf.uuid)      AS total_posforms
 			FROM pos_form_items pfi
 			INNER JOIN pos_forms pf ON pfi.pos_form_uuid = pf.uuid
 			WHERE pf.country_uuid = @country_uuid
@@ -424,7 +428,7 @@ func WSTableViewCommune(c *fiber.Ctx) error {
 			ROUND((bs.brand_sold * 100.0 /
 			       NULLIF(ts.total_sold, 0))::numeric, 2)                        AS ws_percent,
 			ROUND((bs.nd_pos * 100.0 /
-			       NULLIF(ts.total_pos, 0))::numeric, 2)                         AS nd_percent
+			       NULLIF(ts.total_posforms, 0))::numeric, 2)                    AS nd_percent
 		FROM brand_sales bs
 		INNER JOIN brands    b  ON b.uuid  = bs.brand_uuid
 		INNER JOIN communes  co ON co.uuid = bs.commune_uuid
